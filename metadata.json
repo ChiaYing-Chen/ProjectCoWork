@@ -1,0 +1,5 @@
+{
+  "name": "Copy of 工作排程系統 (Project Scheduler)",
+  "description": "一個強大的工作排程系統，支援匯入 Microsoft Project (.mpp) 檔案，並提供月曆與甘特圖兩種檢視模式。使用者可以透過拖拉方式直觀地調整工作排程，並設定前置作業相依性，系統會在排程衝突時提供警示。",
+  "requestFramePermissions": []
+}
