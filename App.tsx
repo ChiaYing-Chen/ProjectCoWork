@@ -11,6 +11,8 @@ import GroupRelationshipView from './components/GroupRelationshipView';
 import ProjectListView from './components/ProjectListView';
 import ProjectFormModal from './components/ProjectFormModal';
 import SettingsModal from './components/SettingsModal';
+import ExecutingUnitManagerModal from './components/ExecutingUnitManagerModal';
+import FilterBar from './components/FilterBar';
 // FIX: Update date-fns imports for v3 compatibility.
 import { addDays, differenceInBusinessDays, differenceInDays } from 'date-fns';
 import { startOfDay } from 'date-fns/startOfDay';
@@ -73,12 +75,14 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
+  const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
 
   const [executingUnits, setExecutingUnits] = useState<string[]>([]);
   
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [notification, setNotification] = useState<NotificationState | null>(null);
 
@@ -300,7 +304,7 @@ const App: React.FC = () => {
     setSelectedTaskIds([]);
   }, [currentProject, selectedTaskIds, showNotification, modifierName]);
 
-  const handleSaveTask = useCallback((taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; }) => {
+  const handleSaveTask = useCallback((taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; predecessorId?: number; }) => {
     if (!currentProject) return;
     
     // Add new executing unit to the list if it doesn't exist
@@ -316,7 +320,7 @@ const App: React.FC = () => {
         if (taskData.id) { // Update
             newTasks = tasks.map(task =>
                 task.id === taskData.id
-                    ? { ...task, name: taskData.name, start: taskData.start, end: taskData.end, executingUnit: taskData.executingUnit }
+                    ? { ...task, name: taskData.name, start: taskData.start, end: taskData.end, executingUnit: taskData.executingUnit, predecessorId: taskData.predecessorId }
                     : task
             );
         } else { // Create
@@ -328,6 +332,7 @@ const App: React.FC = () => {
                 end: taskData.end,
                 progress: 0,
                 executingUnit: taskData.executingUnit,
+                predecessorId: taskData.predecessorId,
             };
             newTasks = [...tasks, newTask];
         }
@@ -548,6 +553,38 @@ const App: React.FC = () => {
     }
   };
 
+  const handleProjectImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const result = event.target?.result;
+            if (typeof result === 'string') {
+                const parsedProject = JSON.parse(result);
+                // Basic validation
+                if (parsedProject.id && parsedProject.name && Array.isArray(parsedProject.tasks)) {
+                    const revivedProject = reviveDates(parsedProject);
+                    // Avoid ID collision by assigning a new one if it exists
+                    if (projects.some(p => p.id === revivedProject.id)) {
+                        revivedProject.id = `proj-${Date.now()}`;
+                        showNotification(`專案ID衝突，已為匯入的專案指派新ID。`, 'info');
+                    }
+                    setProjects(prev => [...prev, revivedProject]);
+                    showNotification(`專案 "${revivedProject.name}" 匯入成功！`, 'success');
+                } else {
+                    throw new Error('無效的專案檔案格式。');
+                }
+            }
+        } catch (error) {
+            console.error("專案匯入失敗:", error);
+            showNotification("無法匯入專案檔案。請確認格式是否正確。", "error");
+        }
+    };
+    reader.onerror = () => {
+         showNotification("讀取檔案時發生錯誤。", "error");
+    };
+    reader.readAsText(file);
+  };
+
   const handleSaveSettings = (newKey: string, newModifierName: string) => {
     localStorage.setItem('project-scheduler-modifier-name', newModifierName);
     setModifierName(newModifierName);
@@ -571,6 +608,14 @@ const App: React.FC = () => {
     }
   }, [showNotification]);
 
+  const handleSelectedUnitsChange = (units: string[]) => {
+    setSelectedUnits(units);
+  };
+  
+  const handlePrint = () => {
+    window.print();
+  };
+
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen"><div>載入中...</div></div>;
@@ -586,6 +631,8 @@ const App: React.FC = () => {
         onBackToProjects={() => setCurrentProjectId(null)}
         onAddTask={openTaskFormForCreate}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenExecutingUnits={() => setIsUnitModalOpen(true)}
+        onPrint={handlePrint}
       />
       <main className="container mx-auto p-4 sm:p-6 lg:p-8">
         {!currentProjectId ? (
@@ -595,11 +642,15 @@ const App: React.FC = () => {
               onCreateProject={() => setIsProjectFormOpen(true)}
               onDeleteProject={handleDeleteProject}
               onExportProject={handleExportProject}
-              executingUnits={executingUnits}
-              onUpdateExecutingUnits={handleUpdateExecutingUnits}
+              onImportProject={handleProjectImport}
            />
         ) : currentProject ? (
           <>
+            <FilterBar 
+              executingUnits={executingUnits.filter(u => currentProject.tasks.some(t => t.executingUnit === u))}
+              selectedUnits={selectedUnits}
+              onSelectedUnitsChange={handleSelectedUnitsChange}
+            />
             {viewMode === ViewMode.Gantt && (
               <GanttChartView 
                 tasks={currentProject.tasks} 
@@ -608,6 +659,7 @@ const App: React.FC = () => {
                 taskGroups={currentProject.taskGroups} 
                 onEditTask={openTaskFormForEdit} 
                 executingUnits={executingUnits}
+                selectedUnits={selectedUnits}
               />
             )}
             {viewMode === ViewMode.Calendar && (
@@ -624,6 +676,7 @@ const App: React.FC = () => {
                 onEditTask={openTaskFormForEdit}
                 executingUnits={executingUnits}
                 onDeleteSelectedTasks={handleDeleteTasks}
+                selectedUnits={selectedUnits}
               />
             )}
             {viewMode === ViewMode.Group && (
@@ -647,6 +700,7 @@ const App: React.FC = () => {
             onClose={() => setIsTaskFormOpen(false)} 
             onSave={handleSaveTask} 
             taskToEdit={taskToEdit} 
+            tasks={currentProject?.tasks || []}
             executingUnits={executingUnits}
             onDelete={(taskId) => {
               handleDeleteTasks([taskId]);
@@ -660,6 +714,12 @@ const App: React.FC = () => {
         onSave={handleSaveSettings}
         currentKey={storageKey}
         currentModifierName={modifierName}
+      />
+       <ExecutingUnitManagerModal 
+        isOpen={isUnitModalOpen}
+        onClose={() => setIsUnitModalOpen(false)}
+        units={executingUnits} 
+        onUpdate={handleUpdateExecutingUnits} 
       />
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
     </div>

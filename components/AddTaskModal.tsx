@@ -5,17 +5,19 @@ import { Task } from '../types';
 interface TaskFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string }) => void;
+  onSave: (taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; predecessorId?: number; }) => void;
   taskToEdit?: Task | null;
+  tasks: Task[];
   executingUnits: string[];
   onDelete?: (taskId: number) => void;
 }
 
-const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, taskToEdit, executingUnits, onDelete }) => {
+const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, taskToEdit, tasks, executingUnits, onDelete }) => {
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [executingUnit, setExecutingUnit] = useState('');
+  const [predecessorId, setPredecessorId] = useState('');
   const [customUnit, setCustomUnit] = useState('');
   const [isCustom, setIsCustom] = useState(false);
   const [error, setError] = useState('');
@@ -26,6 +28,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
     setStartDate(today);
     setEndDate(today);
     setExecutingUnit('');
+    setPredecessorId('');
     setCustomUnit('');
     setIsCustom(false);
     setError('');
@@ -37,6 +40,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
         setName(taskToEdit.name);
         setStartDate(taskToEdit.start.toISOString().split('T')[0]);
         setEndDate(taskToEdit.end.toISOString().split('T')[0]);
+        setPredecessorId(taskToEdit.predecessorId?.toString() || '');
         const unit = taskToEdit.executingUnit || '';
         if (unit && !executingUnits.includes(unit)) {
             setIsCustom(true);
@@ -82,13 +86,16 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
         setError('自訂單位名稱不可為空。');
         return;
     }
+    
+    const finalPredecessorId = predecessorId ? parseInt(predecessorId, 10) : undefined;
 
     onSave({ 
       id: taskToEdit?.id, 
       name: name.trim(), 
       start, 
       end, 
-      executingUnit: finalExecutingUnit || undefined 
+      executingUnit: finalExecutingUnit || undefined,
+      predecessorId: finalPredecessorId
     });
   };
   
@@ -104,6 +111,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
   
   const title = taskToEdit ? '編輯任務' : '新增任務';
   const buttonText = taskToEdit ? '儲存變更' : '儲存任務';
+  const possiblePredecessors = tasks.filter(task => task.id !== taskToEdit?.id);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 transition-opacity" onClick={onClose}>
@@ -120,6 +128,20 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
               className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900"
               placeholder="例如：完成初步設計"
             />
+          </div>
+          <div>
+            <label htmlFor="predecessor-task" className="block text-sm font-medium text-slate-700">前置任務</label>
+            <select
+              id="predecessor-task"
+              value={predecessorId}
+              onChange={(e) => setPredecessorId(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900"
+            >
+              <option value="">無</option>
+              {possiblePredecessors.map(task => (
+                <option key={task.id} value={task.id}>{`#${task.id} ${task.name}`}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label htmlFor="executing-unit" className="block text-sm font-medium text-slate-700">執行單位</label>

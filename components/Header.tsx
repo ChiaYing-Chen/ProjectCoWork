@@ -10,6 +10,8 @@ interface HeaderProps {
   onBackToProjects: () => void;
   onAddTask: () => void;
   onOpenSettings?: () => void;
+  onOpenExecutingUnits?: () => void;
+  onPrint: () => void;
 }
 
 const BackIcon: React.FC = () => (
@@ -30,6 +32,17 @@ const AddIcon: React.FC = () => (
     </svg>
 );
 
+const PrintIcon: React.FC = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H7a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm-3-14H8a2 2 0 00-2 2v2h12V5a2 2 0 00-2-2z" />
+  </svg>
+);
+
+const PdfIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V9a2 2 0 012-2h5l5 5v7a2 2 0 01-2 2z" />
+    </svg>
+);
 
 const GanttIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M3 6h18"/></svg>
@@ -50,13 +63,19 @@ const SettingsIcon: React.FC = () => (
     </svg>
 );
 
+const UserGroupIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.125-1.274-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.125-1.274.356-1.857m0 0a5.002 5.002 0 019.288 0M12 14a4 4 0 100-8 4 4 0 000 8z" />
+    </svg>
+);
+
 const ClockIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
 );
 
-const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetViewMode, onBackToProjects, onAddTask, onOpenSettings }) => {
+const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetViewMode, onBackToProjects, onAddTask, onOpenSettings, onOpenExecutingUnits, onPrint }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,11 +118,18 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
             ) : (
                 <div className="flex items-center space-x-4">
                     <h1 className="text-xl sm:text-2xl font-bold text-blue-600">專案管理</h1>
-                    {onOpenSettings && (
-                        <button onClick={onOpenSettings} className="text-slate-500 hover:text-blue-600 transition duration-300 p-2 rounded-full" title="儲存設定">
-                            <SettingsIcon />
-                        </button>
-                    )}
+                    <div className="flex items-center space-x-2">
+                         {onOpenExecutingUnits && (
+                            <button onClick={onOpenExecutingUnits} className="text-slate-500 hover:text-blue-600 transition duration-300" title="管理執行單位">
+                                <UserGroupIcon />
+                            </button>
+                        )}
+                        {onOpenSettings && (
+                            <button onClick={onOpenSettings} className="text-slate-500 hover:text-blue-600 transition duration-300" title="儲存設定">
+                                <SettingsIcon />
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
           </div>
@@ -118,6 +144,14 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
                     <AddIcon />
                     <span className="hidden sm:inline">新增任務</span>
                 </button>
+                <button onClick={onPrint} className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300">
+                    <PdfIcon />
+                    <span className="hidden sm:inline">儲存為 PDF</span>
+                </button>
+                <button onClick={onPrint} className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300">
+                    <PrintIcon />
+                    <span className="hidden sm:inline">列印</span>
+                </button>
 
                 <div className="bg-slate-200 p-1 rounded-lg flex space-x-1">
                     <button onClick={() => onSetViewMode(ViewMode.Gantt)} className={`flex items-center px-3 py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Gantt ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
@@ -127,7 +161,7 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
                         <CalendarIcon />月曆
                     </button>
                     <button onClick={() => onSetViewMode(ViewMode.Group)} className={`flex items-center px-3 py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Group ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                        <GroupIcon />群組檢視
+                        <GroupIcon />編輯關聯
                     </button>
                 </div>
             </div>

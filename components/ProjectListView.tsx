@@ -1,93 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import { Project } from '../types';
 import { format } from 'date-fns';
 
-interface ExecutingUnitManagerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  units: string[];
-  onUpdate: (newUnits: string[]) => void;
-}
-
-const ExecutingUnitManagerModal: React.FC<ExecutingUnitManagerModalProps> = ({ isOpen, onClose, units, onUpdate }) => {
-    const [newUnit, setNewUnit] = useState('');
-
-    const handleAddUnit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const trimmedUnit = newUnit.trim();
-        if (trimmedUnit && !units.includes(trimmedUnit)) {
-            onUpdate([...units, trimmedUnit]);
-            setNewUnit('');
-        }
-    };
-
-    const handleDeleteUnit = (unitToDelete: string) => {
-        onUpdate(units.filter(unit => unit !== unitToDelete));
-    };
-
-    if (!isOpen) {
-        return null;
-    }
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 transition-opacity" onClick={onClose}>
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg transform transition-all" onClick={e => e.stopPropagation()}>
-                <h2 className="text-2xl font-bold text-slate-800 mb-4">執行單位管理</h2>
-                <div className="mb-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                    {units.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                            {units.map(unit => (
-                                <span key={unit} className="flex items-center bg-slate-200 text-slate-700 text-sm font-medium px-3 py-1 rounded-full">
-                                    {unit}
-                                    <button
-                                        onClick={() => handleDeleteUnit(unit)}
-                                        className="ml-2 -mr-1 w-5 h-5 flex items-center justify-center bg-slate-400 hover:bg-slate-500 text-white rounded-full transition-colors"
-                                        aria-label={`刪除 ${unit}`}
-                                    >
-                                        &times;
-                                    </button>
-                                </span>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-slate-500 text-sm py-4 text-center">尚未新增任何執行單位。</p>
-                    )}
-                </div>
-                <form onSubmit={handleAddUnit} className="flex items-center gap-2 mb-6">
-                    <input
-                        type="text"
-                        value={newUnit}
-                        onChange={(e) => setNewUnit(e.target.value)}
-                        className="flex-grow block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900"
-                        placeholder="輸入新的單位名稱..."
-                    />
-                    <button
-                        type="submit"
-                        className="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
-                    >
-                        新增
-                    </button>
-                </form>
-                <div className="flex justify-end">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
-                    >
-                        關閉
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const UserGroupIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.125-1.274-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.125-1.274.356-1.857m0 0a5.002 5.002 0 019.288 0M12 14a4 4 0 100-8 4 4 0 000 8z" />
-    </svg>
+const ImportIcon: React.FC = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+  </svg>
 );
-
 
 interface ProjectListViewProps {
   projects: Project[];
@@ -95,8 +15,7 @@ interface ProjectListViewProps {
   onCreateProject: () => void;
   onDeleteProject: (projectId: string) => void;
   onExportProject: (projectId: string) => void;
-  executingUnits: string[];
-  onUpdateExecutingUnits: (newUnits: string[]) => void;
+  onImportProject: (file: File) => void;
 }
 
 const ProjectListView: React.FC<ProjectListViewProps> = ({ 
@@ -105,23 +24,34 @@ const ProjectListView: React.FC<ProjectListViewProps> = ({
     onCreateProject, 
     onDeleteProject, 
     onExportProject,
-    executingUnits,
-    onUpdateExecutingUnits
+    onImportProject
 }) => {
-  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+          onImportProject(file);
+      }
+      if (fileInputRef.current) {
+          fileInputRef.current.value = ''; // Reset file input to allow re-importing the same file
+      }
+  };
+
+  const handleImportClick = () => fileInputRef.current?.click();
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold text-slate-800">所有專案</h2>
         <div className="flex items-center space-x-2">
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
             <button
-                onClick={() => setIsUnitModalOpen(true)}
-                className="flex items-center bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300"
-                title="管理執行單位"
+                onClick={handleImportClick}
+                className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300"
             >
-                <UserGroupIcon />
-                <span>執行單位</span>
+              <ImportIcon />
+              匯入專案
             </button>
             <button
               onClick={onCreateProject}
@@ -138,7 +68,7 @@ const ProjectListView: React.FC<ProjectListViewProps> = ({
       {projects.length === 0 ? (
          <div className="text-center py-20 bg-white rounded-lg shadow-md">
             <h2 className="text-2xl font-bold mb-4 text-slate-700">尚未建立任何專案</h2>
-            <p className="text-slate-500">點擊右上角的「建立新專案」按鈕來開始您的第一個專案。</p>
+            <p className="text-slate-500">點擊右上角的「建立新專案」或「匯入專案」按鈕來開始。</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -196,14 +126,6 @@ const ProjectListView: React.FC<ProjectListViewProps> = ({
           ))}
         </div>
       )}
-      
-      <ExecutingUnitManagerModal 
-        isOpen={isUnitModalOpen}
-        onClose={() => setIsUnitModalOpen(false)}
-        units={executingUnits} 
-        onUpdate={onUpdateExecutingUnits} 
-      />
-
     </div>
   );
 };

@@ -20,6 +20,53 @@
   }
 }
 </script>
+<style>
+  @media print {
+    /* Hide elements that should not be printed */
+    header {
+      display: none !important;
+    }
+    
+    /* Reset body and main container for printing */
+    body {
+      background-color: white !important;
+      margin: 0;
+      padding: 0;
+    }
+    
+    main.container {
+      padding: 0 !important;
+      margin: 0 !important;
+      max-width: none !important;
+    }
+
+    /* Ensure the view container takes up the whole space */
+    .view-container {
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+    }
+
+    /* Gantt Chart specific adjustments */
+    .gantt-chart-print-container {
+      overflow-x: visible !important;
+    }
+    .gantt-chart-print-container .sticky {
+        position: static !important; /* Unstick the header */
+    }
+
+    /* Calendar specific adjustments */
+    .calendar-print-container {
+       max-height: none !important; /* Remove the scroll constraint */
+       overflow-y: visible !important;
+    }
+    .calendar-print-container .sticky {
+        position: static !important;
+    }
+  }
+</style>
 </head>
   <body class="bg-slate-100">
     <div id="root"></div>

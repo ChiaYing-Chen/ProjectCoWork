@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Task, Warning, TaskGroup } from '../types';
 // FIX: Update date-fns imports for v3 compatibility.
 import {
@@ -37,20 +37,78 @@ interface CalendarViewProps {
   onEditTask: (task: Task) => void;
   executingUnits: string[];
   onDeleteSelectedTasks: (taskIds: number[]) => void;
+  selectedUnits: string[];
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask, selectedTaskIds, onSelectTask, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask, selectedTaskIds, onSelectTask, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, selectedUnits }) => {
+  const [visibleMonths, setVisibleMonths] = useState([startOfMonth(new Date())]);
+  const [activeMonth, setActiveMonth] = useState(startOfMonth(new Date()));
+  const loaderRef = useRef<HTMLDivElement>(null);
+  const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const activeMonthObserver = useRef<IntersectionObserver | null>(null);
 
-  const firstDayOfMonth = startOfMonth(currentDate);
-  const lastDayOfMonth = endOfMonth(currentDate);
-  const firstDayOfGrid = startOfWeek(firstDayOfMonth, { locale: zhTW });
-  const lastDayOfGrid = endOfWeek(lastDayOfMonth, { locale: zhTW });
+  const filteredTasks = useMemo(() => {
+    if (selectedUnits.length === 0) {
+        return tasks;
+    }
+    return tasks.filter(task => 
+        task.executingUnit && selectedUnits.includes(task.executingUnit)
+    );
+  }, [tasks, selectedUnits]);
 
-  const daysInGrid = eachDayOfInterval({
-    start: firstDayOfGrid,
-    end: lastDayOfGrid,
-  });
+  // Observer to load more months when scrolling to the bottom
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleMonths((prev) => [...prev, addMonths(prev[prev.length - 1], 1)]);
+        }
+      },
+      { root: scrollContainerRef.current, threshold: 0.1 }
+    );
+
+    const currentLoader = loaderRef.current;
+    if (currentLoader) {
+      observer.observe(currentLoader);
+    }
+
+    return () => {
+      if (currentLoader) {
+        observer.unobserve(currentLoader);
+      }
+    };
+  }, []); // Runs only once
+
+  // Observer to track which month is currently active in the viewport
+  useEffect(() => {
+    if (activeMonthObserver.current) {
+      activeMonthObserver.current.disconnect();
+    }
+  
+    activeMonthObserver.current = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            const monthId = (entry.target as HTMLDivElement).dataset.monthId;
+            if (monthId) {
+              const newActiveMonth = new Date(monthId);
+              setActiveMonth(currentActive => 
+                currentActive.getTime() !== newActiveMonth.getTime() ? newActiveMonth : currentActive
+              );
+            }
+          }
+        }
+      },
+      { root: scrollContainerRef.current, threshold: 0.5 }
+    );
+  
+    monthRefs.current.forEach((el) => {
+      activeMonthObserver.current?.observe(el);
+    });
+  
+    return () => activeMonthObserver.current?.disconnect();
+  }, [visibleMonths]); // Re-attach observers when new months are added
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: number) => {
     e.dataTransfer.setData('taskId', taskId.toString());
@@ -72,7 +130,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
 
   const tasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>();
-    tasks.forEach(task => {
+    filteredTasks.forEach(task => {
         const key = format(task.start, 'yyyy-MM-dd');
         if (!map.has(key)) {
             map.set(key, []);
@@ -80,7 +138,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
         map.get(key)!.push(task);
     });
     return map;
-  }, [tasks]);
+  }, [filteredTasks]);
 
   const taskGroupMap = useMemo(() => {
     const map = new Map<string, TaskGroup>();
@@ -98,33 +156,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
 
   const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u)), [executingUnits, tasks]);
 
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-  
   const handleDeleteClick = () => {
       if (selectedTaskIds.length > 0) {
           onDeleteSelectedTasks(selectedTaskIds);
       }
   };
 
-
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 relative">
+    <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 relative flex flex-col view-container">
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <div className="flex-1 flex justify-start">
-            <div className="flex items-center space-x-2">
-                <button onClick={prevMonth} className="p-2 rounded-full hover:bg-slate-100 transition">
-                <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <button onClick={nextMonth} className="p-2 rounded-full hover:bg-slate-100 transition">
-                <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                </button>
-            </div>
+           {/* Placeholder for alignment */}
         </div>
         
         <h2 className="flex-shrink-0 text-xl sm:text-2xl font-bold text-slate-800 text-center">
-          {format(currentDate, 'yyyy年 MMMM', { locale: zhTW })}
+          {format(activeMonth, 'yyyy年 MMMM', { locale: zhTW })}
         </h2>
         
         <div className="flex-1 flex justify-end items-center space-x-2">
@@ -135,121 +182,130 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
                     title="刪除選取的任務"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    刪除 ({selectedTaskIds.length})
+                    刪除
                 </button>
             )}
-            {selectedTaskIds.length > 1 && (
+             {selectedTaskIds.length > 1 && (
                 <button
                     onClick={onCreateGroup}
-                    className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 text-sm flex items-center"
+                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 text-sm flex items-center"
+                    title="將選取的任務建立時間關聯"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                    時間關聯 ({selectedTaskIds.length})
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" /></svg>
+                    關聯
                 </button>
             )}
         </div>
       </div>
       
-      {/* Legend */}
-      {unitsInUse.length > 0 && (
-         <div className="pb-4 mb-4 border-b border-slate-200">
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-                {unitsInUse.map(unit => (
-                    <div key={unit} className="flex items-center">
-                        <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unitColorMap.get(unit) }}></div>
-                        <span className="text-sm text-slate-600">{unit}</span>
+      {(taskGroups.length > 0 || unitsInUse.length > 0) && (
+        <div className="p-4 border-b border-t border-slate-200 bg-slate-50 space-y-4 mb-4 rounded-md flex-shrink-0">
+            {taskGroups.length > 0 && (
+                <div>
+                    <h3 className="text-md font-semibold mb-2 text-slate-700">時間關聯群組圖例</h3>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                        {taskGroups.map((group, index) => (
+                            <div key={group.id} className="flex items-center">
+                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: group.color }}></div>
+                                <span className="text-sm text-slate-600">{group.name || `群組 ${index + 1}`}</span>
+                            </div>
+                        ))}
                     </div>
-                ))}
-            </div>
+                </div>
+            )}
+            {unitsInUse.length > 0 && (
+                 <div>
+                    <h3 className="text-md font-semibold mb-2 text-slate-700">執行單位圖例</h3>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                        {unitsInUse.map(unit => (
+                            <div key={unit} className="flex items-center">
+                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unitColorMap.get(unit) }}></div>
+                                <span className="text-sm text-slate-600">{unit}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
       )}
 
-      {/* Grid */}
-      <div className="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200">
-        {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-          <div key={day} className="text-center py-2 bg-slate-50 font-semibold text-sm text-slate-600">
-            {day}
-          </div>
-        ))}
+      <div className="flex-grow overflow-auto calendar-print-container" ref={scrollContainerRef}>
+        <div className="grid grid-cols-7 text-center font-bold text-slate-600 sticky top-0 bg-white z-10 border-b-2 border-slate-200">
+            {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+              <div key={day} className="py-2">{day}</div>
+            ))}
+        </div>
+        {visibleMonths.map(month => {
+          const start = startOfWeek(startOfMonth(month));
+          const end = endOfWeek(endOfMonth(month));
+          const days = eachDayOfInterval({ start, end });
 
-        {daysInGrid.map(day => {
-          const key = format(day, 'yyyy-MM-dd');
-          const tasksForDay = tasksByDate.get(key) || [];
-          const isCurrentMonth = isSameMonth(day, currentDate);
-          const isToday = isSameDay(day, new Date());
-          
           return (
-            <div
-              key={key}
-              className={`min-h-[120px] bg-white p-2 flex flex-col ${isCurrentMonth ? '' : 'bg-slate-50'}`}
-              onDrop={(e) => handleDrop(e, day)}
-              onDragOver={handleDragOver}
+            <div 
+              key={format(month, 'yyyy-MM')} 
+              className="grid grid-cols-7"
+              data-month-id={month.toISOString()}
+              ref={el => {
+                if (el) monthRefs.current.set(month.toISOString(), el);
+                else monthRefs.current.delete(month.toISOString());
+              }}
             >
-              <span className={`font-semibold ${isToday ? 'bg-blue-500 text-white rounded-full w-7 h-7 flex items-center justify-center' : 'text-slate-600'} ${!isCurrentMonth ? 'text-slate-400' : ''}`}>
-                {format(day, 'd')}
-              </span>
-              <div className="mt-1 space-y-1 overflow-y-auto">
-                {tasksForDay.map(task => {
-                   const isWarning = warnings.some(w => w.taskId === task.id);
-                   const isSelected = selectedTaskIds.includes(task.id);
-                   const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
-                   const taskColor = isWarning ? '#ef4444' : task.executingUnit ? unitColorMap.get(task.executingUnit) : '#3b82f6';
-                   
-                   return (
-                     <div 
-                        key={task.id}
-                        draggable
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectTask(task.id, e.ctrlKey || e.metaKey)
-                        }}
-                        onDoubleClick={() => onEditTask(task)}
-                        onDragStart={(e) => handleDragStart(e, task.id)}
-                        className={`relative text-xs p-1.5 rounded-md text-white cursor-grab transition-all duration-200 ${isSelected ? 'ring-2 ring-offset-1 ring-yellow-400' : ''}`}
-                        style={{ 
-                            backgroundColor: taskColor,
-                            borderLeft: group ? `5px solid ${group.color}` : 'none' 
-                        }}
-                     >
-                       <div className="flex flex-col items-start">
-                         <p className="font-semibold truncate pr-4">{task.name}</p>
-                         {task.executingUnit && (
-                            <span className="mt-1 text-xs bg-black bg-opacity-20 px-1.5 py-0.5 rounded-full font-medium">
-                                {task.executingUnit}
-                            </span>
-                         )}
-                       </div>
-                       {group && isSelected && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onUngroupTask(task.id);
-                            }}
-                            className="absolute top-0.5 right-0.5 w-4 h-4 bg-black bg-opacity-20 rounded-full text-white flex items-center justify-center hover:bg-opacity-50 transition-colors"
-                            title="解除關聯"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      )}
-                     </div>
-                   )
-                })}
-              </div>
+              {days.map(day => {
+                const dayKey = format(day, 'yyyy-MM-dd');
+                const dayTasks = tasksByDate.get(dayKey) || [];
+
+                return (
+                  <div
+                    key={day.toString()}
+                    className={`border-b border-r border-slate-200 min-h-[120px] p-1.5 transition-colors duration-200 ${!isSameMonth(day, month) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, new Date()) ? 'bg-blue-50' : ''}`}
+                    onDrop={(e) => handleDrop(e, day)}
+                    onDragOver={handleDragOver}
+                    onDoubleClick={(e) => {
+                       if (e.target === e.currentTarget) {
+                           onOpenAddTaskModal();
+                       }
+                    }}
+                  >
+                    <time dateTime={format(day, 'yyyy-MM-dd')} className={`text-sm ${isSameMonth(day, month) ? 'text-slate-700' : 'text-slate-400'}`}>
+                      {format(day, 'd')}
+                    </time>
+                    <div className="mt-1 space-y-1">
+                      {dayTasks.map(task => {
+                          const isSelected = selectedTaskIds.includes(task.id);
+                          const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
+                          const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
+                          return (
+                              <div
+                                  key={task.id}
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, task.id)}
+                                  onClick={(e) => onSelectTask(task.id, e.ctrlKey || e.metaKey)}
+                                  onDoubleClick={() => onEditTask(task)}
+                                  className={`p-1.5 rounded-md text-xs cursor-pointer text-white relative transition-all duration-200 ${isSelected ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
+                                  style={{
+                                    backgroundColor: taskColor || '#3b82f6',
+                                    borderLeft: group ? `4px solid ${group.color}` : 'none'
+                                  }}
+                                  title={task.name}
+                              >
+                                  <p className="font-semibold truncate">{task.name}</p>
+                                  {task.groupId && (
+                                    <button onClick={(e) => { e.stopPropagation(); onUngroupTask(task.id); }} className="absolute -top-1 -right-1 bg-white p-0.5 rounded-full text-slate-500 hover:text-red-500 transition-colors shadow" title="從群組中移除">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                                    </button>
+                                  )}
+                              </div>
+                          );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
+        <div ref={loaderRef} className="h-10 text-center text-slate-500">載入更多...</div>
       </div>
-
-       {/* Floating Add Button */}
-       <button 
-        onClick={onOpenAddTaskModal}
-        className="absolute bottom-6 right-6 w-14 h-14 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-        aria-label="新增任務"
-       >
-           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-           </svg>
-       </button>
     </div>
   );
 };
