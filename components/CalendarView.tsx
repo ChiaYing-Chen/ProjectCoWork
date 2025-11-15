@@ -313,7 +313,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         </div>
       </div>
       
-      {sortedYears.length > 1 && (
+      {sortedYears.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
             {sortedYears.map(year => (
                 <div key={year} className="flex items-center">
@@ -397,7 +397,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                         onTouchEnd={handleDayTouchEnd}
                       >
                         <div className={`text-sm ${!isSameMonth(day, month) ? 'text-slate-400' : 'text-slate-700'}`}>
-                          {format(day, 'd')}
+                          {format(day, 'M/d')}
                         </div>
                         <div className="mt-1 space-y-1">
                           {dayTasks.map(task => {
