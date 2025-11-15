@@ -41,7 +41,9 @@ const FilterBar: React.FC<FilterBarProps> = ({ executingUnits, selectedUnits, on
         setIsOpen(false);
     }
     
-    const uniqueUnits = [...new Set(executingUnits)].filter(Boolean); // Filter out empty/null units
+    // FIX: Replace `filter(Boolean)` with an arrow function to ensure correct type inference.
+    // This resolves an issue where the `unit` parameter in the `map` function was being inferred as `unknown`.
+    const uniqueUnits = [...new Set(executingUnits)].filter(u => u); // Filter out empty/null units
 
     if (uniqueUnits.length === 0) return null;
 
