@@ -4,6 +4,7 @@ import { Task, Warning, TaskGroup } from '../types';
 // FIX: Update date-fns imports for v3 compatibility.
 import { format, differenceInDays, addDays } from 'date-fns';
 import { startOfDay } from 'date-fns/startOfDay';
+import { zhTW } from 'date-fns/locale/zh-TW';
 
 const ROW_HEIGHT = 40;
 const DAY_WIDTH = 40;
@@ -29,11 +30,31 @@ interface GanttTaskBarProps {
 }
 
 const GanttTaskBar: React.FC<GanttTaskBarProps> = ({ task, isWarning, left, width, top, onDragStart, onDoubleClick, groupColor, taskColor }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipTimer = useRef<number | null>(null);
+
+  const handleMouseEnter = () => {
+    if (task.notes) {
+      tooltipTimer.current = window.setTimeout(() => {
+        setShowTooltip(true);
+      }, 1500);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (tooltipTimer.current) {
+      clearTimeout(tooltipTimer.current);
+    }
+    setShowTooltip(false);
+  };
+
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, task.id)}
       onDoubleClick={() => onDoubleClick(task)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`absolute h-8 px-2 flex items-center rounded-lg cursor-grab active:cursor-grabbing transition-all duration-200 group`}
       style={{ left: `${left}px`, width: `${width}px`, top: `${top}px` }}
     >
@@ -46,6 +67,11 @@ const GanttTaskBar: React.FC<GanttTaskBarProps> = ({ task, isWarning, left, widt
       >
         <span className="relative text-xs font-semibold truncate px-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.6)' }}>{task.name}</span>
       </div>
+      {showTooltip && task.notes && (
+        <div className="absolute bottom-full mb-2 w-max max-w-xs bg-slate-800 text-white text-xs rounded py-1 px-2 z-50 shadow-lg whitespace-pre-wrap" style={{ left: 0 }}>
+          {task.notes}
+        </div>
+      )}
     </div>
   );
 };
@@ -117,36 +143,6 @@ const GanttChartView: React.FC<{
     e.preventDefault();
   };
 
-  const dependencyLines = useMemo(() => {
-    return tasks.filter(t => t.predecessorId).map(task => {
-        const predecessor = tasks.find(p => p.id === task.predecessorId);
-        if (!predecessor) return null;
-
-        const startIndex = visualIndexMap.get(predecessor.id);
-        const endIndex = visualIndexMap.get(task.id);
-
-        if (startIndex === undefined || endIndex === undefined) return null;
-
-        const startX = (differenceInDays(predecessor.end, startDate)) * DAY_WIDTH + DAY_WIDTH / 2;
-        const startY = startIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-        const endX = (differenceInDays(task.start, startDate)) * DAY_WIDTH + DAY_WIDTH / 2;
-        const endY = endIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-        const isWarning = warnings.some(w => w.taskId === task.id);
-
-        return {
-            id: `${predecessor.id}-${task.id}`,
-            isWarning,
-            path: `M ${startX} ${startY} L ${startX + 20} ${startY} L ${startX + 20} ${endY} L ${endX} ${endY}`
-        };
-    }).filter(Boolean);
-  }, [tasks, startDate, warnings, visualIndexMap]);
-
-  const taskGroupMap = useMemo(() => {
-    const map = new Map<string, TaskGroup>();
-    taskGroups.forEach(group => map.set(group.id, group));
-    return map;
-  }, [taskGroups]);
-
   const unitColorMap = useMemo(() => {
     const map = new Map<string, string>();
     executingUnits.forEach(unit => {
@@ -158,16 +154,16 @@ const GanttChartView: React.FC<{
   const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u)), [executingUnits, tasks]);
 
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden view-container">
+    <div className="bg-white rounded-lg shadow-lg flex flex-col view-container">
       {(taskGroups.length > 0 || unitsInUse.length > 0) && (
-        <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-4">
+        <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-4 rounded-t-lg">
             {taskGroups.length > 0 && (
                 <div>
                     <h3 className="text-md font-semibold mb-2 text-slate-700">時間關聯群組圖例</h3>
                     <div className="flex flex-wrap gap-x-6 gap-y-2">
                         {taskGroups.map((group, index) => (
                             <div key={group.id} className="flex items-center">
-                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: group.color }}></div>
+                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ borderLeft: `4px solid ${group.color}` }}></div>
                                 <span className="text-sm text-slate-600">{group.name || `群組 ${index + 1}`}</span>
                             </div>
                         ))}
@@ -189,87 +185,79 @@ const GanttChartView: React.FC<{
             )}
         </div>
       )}
-      <div className="flex">
-        {/* Sidebar */}
-        <div className="flex-shrink-0 bg-slate-50 border-r border-slate-200" style={{ width: `${SIDEBAR_WIDTH}px` }}>
-          <div className="h-16 flex items-center px-4 font-semibold text-slate-700 border-b border-slate-200">
-            任務名稱
+      <div className="overflow-x-auto gantt-print-container">
+        <div className="flex" style={{ width: SIDEBAR_WIDTH + timelineWidth }}>
+          {/* Sidebar */}
+          <div className="w-[250px] flex-shrink-0 border-r border-slate-200 bg-slate-50 sticky left-0 z-20">
+            <div className="h-16 flex items-center px-4 border-b border-slate-200 sticky top-0 bg-slate-50 z-10">
+              <h3 className="font-bold text-slate-700">任務名稱</h3>
+            </div>
+            <div className="divide-y divide-slate-200">
+              {filteredTasks.map((task) => (
+                <div key={task.id} className="h-10 flex items-center px-4 text-sm text-slate-600" style={{ height: ROW_HEIGHT }}>
+                  <span className="truncate">{task.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="relative" style={{ height: `${filteredTasks.length * ROW_HEIGHT}px`}}>
-            {filteredTasks.map((task, index) => (
-              <div key={task.id} className="absolute w-full h-10 flex flex-col justify-center items-start px-4 truncate border-b border-slate-200" style={{top: `${index * ROW_HEIGHT}px`}}>
-                <span className="text-sm text-slate-800">{task.name}</span>
-                {task.executingUnit && <span className="text-xs text-slate-500">{task.executingUnit}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Chart */}
-        <div className="flex-grow overflow-x-auto gantt-chart-print-container">
-          <div className="relative" style={{ height: `${filteredTasks.length * ROW_HEIGHT + 64}px`, width: `${timelineWidth}px` }} ref={chartContainerRef} onDrop={handleDrop} onDragOver={handleDragOver}>
-            {/* Header */}
+          {/* Chart */}
+          <div className="relative" ref={chartContainerRef} onDrop={handleDrop} onDragOver={handleDragOver}>
+            {/* Timeline Header */}
             <div className="sticky top-0 bg-white z-10">
-              <div className="flex h-16 border-b border-slate-200">
-                {Array.from({ length: totalDays }).map((_, i) => {
+              <div className="flex" style={{ width: timelineWidth }}>
+                {[...Array(totalDays)].map((_, i) => {
                   const day = addDays(startDate, i);
                   const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                   return (
-                    <div key={i} className={`flex-shrink-0 flex flex-col items-center justify-center border-r border-slate-200 ${isWeekend ? 'bg-slate-50' : ''}`} style={{ width: `${DAY_WIDTH}px` }}>
-                       <span className="text-xs text-slate-500">{format(day, 'EEE')}</span>
-                       <span className="text-sm font-medium">{format(day, 'd')}</span>
+                    <div key={i} className={`flex-shrink-0 border-r border-b border-slate-200 text-center ${isWeekend ? 'bg-slate-50' : ''}`} style={{ width: DAY_WIDTH }}>
+                      <div className="text-xs text-slate-500">{format(day, 'EEE', { locale: zhTW })}</div>
+                      <div className="text-sm font-semibold text-slate-700">{format(day, 'd')}</div>
                     </div>
                   );
                 })}
               </div>
             </div>
             
-            {/* Grid */}
-             <div className="absolute top-16 left-0 w-full" style={{height: `${filteredTasks.length * ROW_HEIGHT}px`}}>
-               {Array.from({ length: totalDays }).map((_, i) => (
-                    <div key={i} className="absolute top-0 bottom-0 border-r border-slate-100" style={{ left: `${i * DAY_WIDTH}px`, width: `${DAY_WIDTH}px` }}></div>
-                ))}
-                {filteredTasks.map((_, i) => (
-                     <div key={i} className="absolute left-0 right-0 border-b border-slate-100" style={{ top: `${i * ROW_HEIGHT}px`, height: `${ROW_HEIGHT}px` }}></div>
-                ))}
-            </div>
+            {/* Grid and Tasks */}
+            <div className="relative" style={{ height: filteredTasks.length * ROW_HEIGHT }}>
+              {/* Vertical Grid lines */}
+              {[...Array(totalDays)].map((_, i) => (
+                <div key={i} className="absolute top-0 bottom-0 border-r border-slate-200" style={{ left: i * DAY_WIDTH, width: DAY_WIDTH }}></div>
+              ))}
+              {/* Horizontal Grid lines */}
+              {filteredTasks.map((_, index) => (
+                <div key={index} className="absolute left-0 right-0 border-b border-slate-200" style={{ top: (index + 1) * ROW_HEIGHT }}></div>
+              ))}
 
-            {/* Dependency Lines */}
-            <svg className="absolute top-16 left-0 w-full h-full pointer-events-none" style={{height: `${filteredTasks.length * ROW_HEIGHT}px`}}>
-                 {dependencyLines.map(line => line && (
-                     <path key={line.id} d={line.path} stroke={line.isWarning ? '#ef4444' : '#94a3b8'} strokeWidth="2" fill="none" markerEnd="url(#arrow)"/>
-                 ))}
-                 <defs>
-                     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                         <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
-                     </marker>
-                 </defs>
-            </svg>
+              {/* Task Bars */}
+              {filteredTasks.map(task => {
+                const visualIndex = visualIndexMap.get(task.id);
+                if (visualIndex === undefined) return null;
 
-            {/* Task Bars */}
-            <div className="absolute top-16 left-0">
-            {filteredTasks.map((task, index) => {
-              const left = (differenceInDays(task.start, startDate)) * DAY_WIDTH;
-              const width = (differenceInDays(task.end, task.start) + 1) * DAY_WIDTH - 4; // a bit of padding
-              const isWarning = warnings.some(w => w.taskId === task.id);
-              const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
-              const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
-
-              return (
-                <GanttTaskBar
-                  key={task.id}
-                  task={task}
-                  isWarning={isWarning}
-                  left={left}
-                  width={width}
-                  top={index * ROW_HEIGHT + 4}
-                  onDragStart={handleDragStart}
-                  onDoubleClick={onEditTask}
-                  groupColor={group?.color}
-                  taskColor={taskColor}
-                />
-              );
-            })}
+                const top = visualIndex * ROW_HEIGHT + (ROW_HEIGHT - 32) / 2;
+                const left = differenceInDays(task.start, startDate) * DAY_WIDTH;
+                const width = (differenceInDays(task.end, task.start) + 1) * DAY_WIDTH - 4;
+                const isWarning = warnings.some(w => w.taskId === task.id);
+                
+                const group = task.groupId ? taskGroups.find(g => g.id === task.groupId) : undefined;
+                const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
+                
+                return (
+                  <GanttTaskBar
+                    key={task.id}
+                    task={task}
+                    isWarning={isWarning}
+                    left={left}
+                    width={width}
+                    top={top}
+                    onDragStart={handleDragStart}
+                    onDoubleClick={onEditTask}
+                    groupColor={group?.color}
+                    taskColor={taskColor}
+                  />
+                );
+              })}
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Task, Warning, TaskGroup } from '../types';
+import DayViewModal from './DayViewModal';
 // FIX: Update date-fns imports for v3 compatibility.
 import {
   format,
@@ -24,12 +25,82 @@ const getUnitColor = (unit: string, allUnits: string[]) => {
     return UNIT_COLORS[index % UNIT_COLORS.length];
 };
 
+interface CalendarTaskItemProps {
+  task: Task;
+  isSelected: boolean;
+  isTouched: boolean;
+  group?: TaskGroup;
+  taskColor?: string;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: number) => void;
+  onSelectTask: (taskId: number, isCtrlOrMetaKey: boolean) => void;
+  onEditTask: (task: Task) => void;
+  onUngroupTask: (taskId: number) => void;
+}
+
+const CalendarTaskItem: React.FC<CalendarTaskItemProps> = ({ task, isSelected, isTouched, group, taskColor, onDragStart, onSelectTask, onEditTask, onUngroupTask }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipTimer = useRef<number | null>(null);
+
+  const handleMouseEnter = () => {
+    if (task.notes) {
+      tooltipTimer.current = window.setTimeout(() => {
+        setShowTooltip(true);
+      }, 1500);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (tooltipTimer.current) {
+      clearTimeout(tooltipTimer.current);
+    }
+    setShowTooltip(false);
+  };
+  
+  const dynamicClasses = isTouched
+    ? 'transform scale-105 ring-2 ring-yellow-400 ring-offset-2 z-10 shadow-lg'
+    : isSelected
+    ? 'ring-2 ring-offset-1 ring-blue-500'
+    : '';
+
+  return (
+    <div
+        draggable
+        data-task-id={task.id}
+        onDragStart={(e) => onDragStart(e, task.id)}
+        onClick={(e) => onSelectTask(task.id, e.ctrlKey || e.metaKey)}
+        onDoubleClick={() => onEditTask(task)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className={`p-1.5 rounded-md text-xs cursor-pointer text-white relative transition-all duration-200 ${dynamicClasses}`}
+        style={{
+          backgroundColor: taskColor || '#3b82f6',
+          borderLeft: group ? `4px solid ${group.color}` : 'none'
+        }}
+        title={task.name}
+    >
+        <p className="font-semibold truncate">{task.name}</p>
+        {task.groupId && (
+          <button onClick={(e) => { e.stopPropagation(); onUngroupTask(task.id); }} className="absolute -top-1 -right-1 bg-white p-0.5 rounded-full text-slate-500 hover:text-red-500 transition-colors shadow" title="從群組中移除">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+          </button>
+        )}
+        {showTooltip && task.notes && (
+          <div className="absolute bottom-full mb-2 w-max max-w-xs bg-slate-800 text-white text-xs rounded py-1 px-2 z-50 shadow-lg whitespace-pre-wrap" style={{ left: 0 }}>
+            {task.notes}
+          </div>
+        )}
+    </div>
+  );
+};
+
+
 interface CalendarViewProps {
   tasks: Task[];
   warnings: Warning[];
   onDragTask: (taskId: number, newStartDate: Date) => void;
   selectedTaskIds: number[];
   onSelectTask: (taskId: number, isCtrlOrMetaKey: boolean) => void;
+  onMultiSelectTasks: (taskIds: number[]) => void;
   onCreateGroup: () => void;
   onOpenAddTaskModal: () => void;
   onUngroupTask: (taskId: number) => void;
@@ -40,13 +111,22 @@ interface CalendarViewProps {
   selectedUnits: string[];
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask, selectedTaskIds, onSelectTask, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, selectedUnits }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, selectedUnits }) => {
   const [visibleMonths, setVisibleMonths] = useState([startOfMonth(new Date())]);
   const [activeMonth, setActiveMonth] = useState(startOfMonth(new Date()));
+  const [touchedTaskIds, setTouchedTaskIds] = useState<Set<number>>(new Set());
+  const [dayViewDate, setDayViewDate] = useState<Date | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeMonthObserver = useRef<IntersectionObserver | null>(null);
+  const touchStateRef = useRef({ touchedTaskIds: new Set<number>() });
+  const longPressTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    touchStateRef.current.touchedTaskIds = touchedTaskIds;
+  }, [touchedTaskIds]);
+
 
   const filteredTasks = useMemo(() => {
     if (selectedUnits.length === 0) {
@@ -127,6 +207,76 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
+
+  const getTaskIdsFromTouches = useCallback((touches: React.TouchList): Set<number> => {
+    const ids = new Set<number>();
+    const touchCount = Math.min(touches.length, 4);
+
+    for (let i = 0; i < touchCount; i++) {
+        const touch = touches[i];
+        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+        const taskElement = element?.closest<HTMLElement>('[data-task-id]');
+        if (taskElement && taskElement.dataset.taskId) {
+            ids.add(parseInt(taskElement.dataset.taskId, 10));
+        }
+    }
+    return ids;
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length > 1) {
+        e.preventDefault();
+        const ids = getTaskIdsFromTouches(e.touches);
+        setTouchedTaskIds(ids);
+    }
+  }, [getTaskIdsFromTouches]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length > 1) {
+          e.preventDefault();
+          const ids = getTaskIdsFromTouches(e.touches);
+          setTouchedTaskIds(ids);
+      }
+  }, [getTaskIdsFromTouches]);
+  
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length === 0 && touchStateRef.current.touchedTaskIds.size > 1) {
+          e.preventDefault();
+          onMultiSelectTasks(Array.from(touchStateRef.current.touchedTaskIds));
+      }
+      if (e.touches.length === 0) {
+          setTouchedTaskIds(new Set());
+      }
+  }, [onMultiSelectTasks]);
+
+  const handleDayClick = (e: React.MouseEvent<HTMLDivElement>, day: Date) => {
+    if (e.target === e.currentTarget) {
+        setDayViewDate(day);
+    }
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+    }
+  };
+
+  const handleDayTouchStart = (day: Date) => {
+      clearLongPressTimer();
+      longPressTimer.current = window.setTimeout(() => {
+          setDayViewDate(day);
+      }, 500);
+  };
+  
+  const handleDayTouchMove = () => {
+      clearLongPressTimer();
+  };
+
+  const handleDayTouchEnd = () => {
+      clearLongPressTimer();
+  };
+
 
   const tasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>();
@@ -229,7 +379,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
         </div>
       )}
 
-      <div className="flex-grow overflow-auto calendar-print-container" ref={scrollContainerRef}>
+      <div 
+        className="flex-grow overflow-auto calendar-print-container" 
+        ref={scrollContainerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div className="grid grid-cols-7 text-center font-bold text-slate-600 sticky top-0 bg-white z-10 border-b-2 border-slate-200">
             {['日', '一', '二', '三', '四', '五', '六'].map(day => (
               <div key={day} className="py-2">{day}</div>
@@ -257,14 +413,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
                 return (
                   <div
                     key={day.toString()}
-                    className={`border-b border-r border-slate-200 min-h-[120px] p-1.5 transition-colors duration-200 ${!isSameMonth(day, month) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, new Date()) ? 'bg-blue-50' : ''}`}
+                    className={`border-b border-r border-slate-200 min-h-[120px] p-1.5 transition-colors duration-200 cursor-pointer ${!isSameMonth(day, month) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, new Date()) ? 'bg-blue-50' : ''}`}
                     onDrop={(e) => handleDrop(e, day)}
                     onDragOver={handleDragOver}
+                    onClick={(e) => handleDayClick(e, day)}
                     onDoubleClick={(e) => {
                        if (e.target === e.currentTarget) {
                            onOpenAddTaskModal();
                        }
                     }}
+                    onTouchStart={() => handleDayTouchStart(day)}
+                    onTouchMove={handleDayTouchMove}
+                    onTouchEnd={handleDayTouchEnd}
                   >
                     <time dateTime={format(day, 'yyyy-MM-dd')} className={`text-sm ${isSameMonth(day, month) ? 'text-slate-700' : 'text-slate-400'}`}>
                       {format(day, 'd')}
@@ -275,26 +435,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
                           const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
                           const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
                           return (
-                              <div
-                                  key={task.id}
-                                  draggable
-                                  onDragStart={(e) => handleDragStart(e, task.id)}
-                                  onClick={(e) => onSelectTask(task.id, e.ctrlKey || e.metaKey)}
-                                  onDoubleClick={() => onEditTask(task)}
-                                  className={`p-1.5 rounded-md text-xs cursor-pointer text-white relative transition-all duration-200 ${isSelected ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
-                                  style={{
-                                    backgroundColor: taskColor || '#3b82f6',
-                                    borderLeft: group ? `4px solid ${group.color}` : 'none'
-                                  }}
-                                  title={task.name}
-                              >
-                                  <p className="font-semibold truncate">{task.name}</p>
-                                  {task.groupId && (
-                                    <button onClick={(e) => { e.stopPropagation(); onUngroupTask(task.id); }} className="absolute -top-1 -right-1 bg-white p-0.5 rounded-full text-slate-500 hover:text-red-500 transition-colors shadow" title="從群組中移除">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                                    </button>
-                                  )}
-                              </div>
+                              <CalendarTaskItem
+                                key={task.id}
+                                task={task}
+                                isSelected={isSelected}
+                                isTouched={touchedTaskIds.has(task.id)}
+                                group={group}
+                                taskColor={taskColor}
+                                onDragStart={handleDragStart}
+                                onSelectTask={onSelectTask}
+                                onEditTask={onEditTask}
+                                onUngroupTask={onUngroupTask}
+                              />
                           );
                       })}
                     </div>
@@ -306,6 +458,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
         })}
         <div ref={loaderRef} className="h-10 text-center text-slate-500">載入更多...</div>
       </div>
+      <DayViewModal
+        date={dayViewDate}
+        onClose={() => setDayViewDate(null)}
+        tasks={filteredTasks}
+        taskGroups={taskGroups}
+        executingUnits={executingUnits}
+        onEditTask={onEditTask}
+        getUnitColor={getUnitColor}
+      />
     </div>
   );
 };

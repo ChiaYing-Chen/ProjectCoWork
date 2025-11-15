@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Project } from '../types';
 import { format } from 'date-fns';
 
@@ -9,6 +9,57 @@ const ImportIcon: React.FC = () => (
   </svg>
 );
 
+const EditableText: React.FC<{ value: string, onSave: (newValue: string) => void, textClasses: string }> = ({ value, onSave, textClasses }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [text, setText] = useState(value);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleSave = () => {
+        if (text.trim() && text.trim() !== value) {
+            onSave(text.trim());
+        } else {
+            setText(value); // Revert if empty or unchanged
+        }
+        setIsEditing(false);
+    };
+    
+    useEffect(() => {
+        if (isEditing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [isEditing]);
+
+    if (isEditing) {
+        return (
+            <div className={textClasses}>
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onBlur={handleSave}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSave();
+                        if (e.key === 'Escape') {
+                            setText(value);
+                            setIsEditing(false);
+                        }
+                    }}
+                    className="w-full bg-transparent border-b-2 border-blue-500 focus:outline-none"
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div onClick={() => setIsEditing(true)} className={`${textClasses} cursor-pointer hover:bg-slate-100 rounded-md -m-2 p-2`} title="點擊以編輯名稱">
+            <h3 className="truncate">{value}</h3>
+        </div>
+    );
+};
+
+
 interface ProjectListViewProps {
   projects: Project[];
   onSelectProject: (projectId: string) => void;
@@ -16,6 +67,7 @@ interface ProjectListViewProps {
   onDeleteProject: (projectId: string) => void;
   onExportProject: (projectId: string) => void;
   onImportProject: (file: File) => void;
+  onUpdateProjectName: (projectId: string, newName: string) => void;
 }
 
 const ProjectListView: React.FC<ProjectListViewProps> = ({ 
@@ -24,7 +76,8 @@ const ProjectListView: React.FC<ProjectListViewProps> = ({
     onCreateProject, 
     onDeleteProject, 
     onExportProject,
-    onImportProject
+    onImportProject,
+    onUpdateProjectName
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,7 +129,11 @@ const ProjectListView: React.FC<ProjectListViewProps> = ({
             <div key={project.id} className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col">
               <div className="p-6 flex-grow flex flex-col">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">{project.name}</h3>
+                  <EditableText
+                    value={project.name}
+                    onSave={(newName) => onUpdateProjectName(project.id, newName)}
+                    textClasses="text-xl font-bold text-slate-800 mb-2"
+                  />
                   <p className="text-sm text-slate-500 mb-4">
                     {format(project.startDate, 'yyyy/MM/dd')} - {format(project.endDate, 'yyyy/MM/dd')}
                   </p>

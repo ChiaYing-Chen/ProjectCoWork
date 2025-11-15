@@ -15,45 +15,45 @@ interface HeaderProps {
 }
 
 const BackIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
     </svg>
 );
 
 const FileImportIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
   </svg>
 );
 
 const AddIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
 );
 
 const PrintIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H7a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm-3-14H8a2 2 0 00-2 2v2h12V5a2 2 0 00-2-2z" />
   </svg>
 );
 
 const PdfIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V9a2 2 0 012-2h5l5 5v7a2 2 0 01-2 2z" />
     </svg>
 );
 
 const GanttIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M3 6h18"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M3 6h18"/></svg>
 );
 
 const CalendarIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
 );
 
 const GroupIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" /></svg>
 );
 
 const SettingsIcon: React.FC = () => (
@@ -97,7 +97,7 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
           <div className="flex items-center space-x-4">
             {project ? (
                <>
-                <button onClick={onBackToProjects} className="flex items-center text-slate-500 hover:text-blue-600 transition duration-300 p-2 -ml-2 rounded-full">
+                <button onClick={onBackToProjects} className="flex items-center text-slate-500 hover:text-blue-600 transition duration-300 p-2 -ml-2 rounded-full" title="返回專案列表">
                     <BackIcon />
                 </button>
                 <div className="flex items-baseline space-x-4">
@@ -136,32 +136,32 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
           {project && (
             <div className="flex items-center space-x-2 sm:space-x-4">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".mpp" />
-                <button onClick={handleImportClick} className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300">
+                <button onClick={handleImportClick} title="匯入 MPP 檔案" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
                     <FileImportIcon />
-                    <span className="hidden sm:inline">匯入</span>
+                    <span className="hidden sm:inline sm:ml-2">匯入</span>
                 </button>
-                 <button onClick={onAddTask} className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                 <button onClick={onAddTask} title="新增任務" className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
                     <AddIcon />
-                    <span className="hidden sm:inline">新增任務</span>
+                    <span className="hidden sm:inline sm:ml-2">新增任務</span>
                 </button>
-                <button onClick={onPrint} className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300">
+                <button onClick={onPrint} title="儲存為 PDF" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
                     <PdfIcon />
-                    <span className="hidden sm:inline">儲存為 PDF</span>
+                    <span className="hidden sm:inline sm:ml-2">儲存為 PDF</span>
                 </button>
-                <button onClick={onPrint} className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300">
+                <button onClick={onPrint} title="列印" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
                     <PrintIcon />
-                    <span className="hidden sm:inline">列印</span>
+                    <span className="hidden sm:inline sm:ml-2">列印</span>
                 </button>
 
                 <div className="bg-slate-200 p-1 rounded-lg flex space-x-1">
-                    <button onClick={() => onSetViewMode(ViewMode.Gantt)} className={`flex items-center px-3 py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Gantt ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                        <GanttIcon />甘特圖
+                    <button onClick={() => onSetViewMode(ViewMode.Gantt)} title="甘特圖" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Gantt ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
+                        <GanttIcon /><span className="hidden sm:inline sm:ml-2">甘特圖</span>
                     </button>
-                    <button onClick={() => onSetViewMode(ViewMode.Calendar)} className={`flex items-center px-3 py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Calendar ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                        <CalendarIcon />月曆
+                    <button onClick={() => onSetViewMode(ViewMode.Calendar)} title="月曆" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Calendar ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
+                        <CalendarIcon /><span className="hidden sm:inline sm:ml-2">月曆</span>
                     </button>
-                    <button onClick={() => onSetViewMode(ViewMode.Group)} className={`flex items-center px-3 py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Group ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                        <GroupIcon />編輯關聯
+                    <button onClick={() => onSetViewMode(ViewMode.Group)} title="編輯關聯" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Group ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
+                        <GroupIcon /><span className="hidden sm:inline sm:ml-2">編輯關聯</span>
                     </button>
                 </div>
             </div>

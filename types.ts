@@ -18,6 +18,7 @@ export interface Task {
   predecessorId?: number;
   groupId?: string;
   executingUnit?: string;
+  notes?: string;
 }
 
 export enum ViewMode {

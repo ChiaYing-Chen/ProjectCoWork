@@ -5,7 +5,7 @@ import { Task } from '../types';
 interface TaskFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; predecessorId?: number; }) => void;
+  onSave: (taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; predecessorId?: number; notes?: string; }) => void;
   taskToEdit?: Task | null;
   tasks: Task[];
   executingUnits: string[];
@@ -18,6 +18,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
   const [endDate, setEndDate] = useState('');
   const [executingUnit, setExecutingUnit] = useState('');
   const [predecessorId, setPredecessorId] = useState('');
+  const [notes, setNotes] = useState('');
   const [customUnit, setCustomUnit] = useState('');
   const [isCustom, setIsCustom] = useState(false);
   const [error, setError] = useState('');
@@ -29,6 +30,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
     setEndDate(today);
     setExecutingUnit('');
     setPredecessorId('');
+    setNotes('');
     setCustomUnit('');
     setIsCustom(false);
     setError('');
@@ -41,6 +43,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
         setStartDate(taskToEdit.start.toISOString().split('T')[0]);
         setEndDate(taskToEdit.end.toISOString().split('T')[0]);
         setPredecessorId(taskToEdit.predecessorId?.toString() || '');
+        setNotes(taskToEdit.notes || '');
         const unit = taskToEdit.executingUnit || '';
         if (unit && !executingUnits.includes(unit)) {
             setIsCustom(true);
@@ -95,7 +98,8 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
       start, 
       end, 
       executingUnit: finalExecutingUnit || undefined,
-      predecessorId: finalPredecessorId
+      predecessorId: finalPredecessorId,
+      notes: notes.trim() || undefined
     });
   };
   
@@ -189,6 +193,17 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
                 className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900"
               />
             </div>
+          </div>
+           <div>
+            <label htmlFor="task-notes" className="block text-sm font-medium text-slate-700">備註</label>
+            <textarea
+                id="task-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900"
+                placeholder="輸入任務的相關備註..."
+            />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
