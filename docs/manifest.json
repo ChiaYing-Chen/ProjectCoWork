@@ -1,0 +1,17 @@
+{
+  "name": "專案管理工具",
+  "short_name": "專案管理",
+  "description": "透過月曆與甘特圖方式管理專案",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
