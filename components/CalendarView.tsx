@@ -96,6 +96,7 @@ const CalendarTaskItem: React.FC<CalendarTaskItemProps> = ({ task, isSelected, i
 
 interface CalendarViewProps {
   tasks: Task[];
+  projectStartDate: Date;
   warnings: Warning[];
   onDragTask: (taskId: number, newStartDate: Date) => void;
   selectedTaskIds: number[];
@@ -111,9 +112,10 @@ interface CalendarViewProps {
   selectedUnits: string[];
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, selectedUnits }) => {
-  const [visibleMonths, setVisibleMonths] = useState([startOfMonth(new Date())]);
-  const [activeMonth, setActiveMonth] = useState(startOfMonth(new Date()));
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, selectedUnits }) => {
+  const initialMonth = startOfMonth(projectStartDate || new Date());
+  const [visibleMonths, setVisibleMonths] = useState([initialMonth]);
+  const [activeMonth, setActiveMonth] = useState(initialMonth);
   const [touchedTaskIds, setTouchedTaskIds] = useState<Set<number>>(new Set());
   const [dayViewDate, setDayViewDate] = useState<Date | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -126,6 +128,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, warnings, onDragTask
   useEffect(() => {
     touchStateRef.current.touchedTaskIds = touchedTaskIds;
   }, [touchedTaskIds]);
+
+  // Reset calendar to project start date when project changes
+  useEffect(() => {
+    const newInitialMonth = startOfMonth(projectStartDate || new Date());
+    setActiveMonth(newInitialMonth);
+    setVisibleMonths([newInitialMonth]);
+    if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [projectStartDate]);
 
 
   const filteredTasks = useMemo(() => {

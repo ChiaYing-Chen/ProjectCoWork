@@ -682,7 +682,8 @@ const App: React.FC = () => {
             )}
             {viewMode === ViewMode.Calendar && (
               <CalendarView 
-                tasks={currentProject.tasks} 
+                tasks={currentProject.tasks}
+                projectStartDate={currentProject.startDate}
                 warnings={warnings} 
                 onDragTask={handleDragTask} 
                 selectedTaskIds={selectedTaskIds}
