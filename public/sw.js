@@ -1,10 +1,9 @@
 const CACHE_NAME = 'project-scheduler-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  // Vite 在建置時會產生動態雜湊的檔案名稱，
-  // Service Worker 通常需要與建置工具（如 Vite PWA 插件）整合才能可靠地快取這些檔案。
-  // 在這個手動設定中，我們快取根路徑，並在 fetch 事件中動態快取其他資源。
+  './',
+  './index.html',
+  './manifest.json',
+  './icon.svg'
 ];
 
 // 安裝 Service Worker
