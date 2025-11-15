@@ -573,6 +573,32 @@ const App: React.FC = () => {
     showNotification('專案名稱已更新', 'success');
   }, [projects, modifierName, showNotification]);
 
+  const handleUpdateProjectDates = useCallback((projectId: string, newStartDate: Date, newEndDate: Date) => {
+    if (newEndDate < newStartDate) {
+      showNotification('專案結束日期不能早于開始日期。', 'error');
+      // To prevent a flicker, we don't immediately revert in the UI,
+      // but the state won't be updated, so it will revert on the next render.
+      // A more robust solution might involve temporarily storing the invalid state and reverting.
+      // For now, the notification is the primary feedback.
+      return;
+    }
+
+    const now = new Date();
+    setProjects(prevProjects =>
+      prevProjects.map(p =>
+        p.id === projectId ? { 
+            ...p, 
+            startDate: newStartDate,
+            endDate: newEndDate,
+            lastModified: now,
+            lastModifiedBy: modifierName 
+        } : p
+      )
+    );
+    // Silent success or a subtle notification could be used here.
+    // showNotification('專案日期已更新', 'success');
+  }, [modifierName, showNotification]);
+
   const handleDeleteGroup = (groupId: string) => {
     if (!currentProject) return;
     updateCurrentProject(proj => {
@@ -718,6 +744,7 @@ const App: React.FC = () => {
               onDeleteProject={handleDeleteProject}
               onExportProject={handleExportProject}
               onUpdateProjectName={handleUpdateProjectName}
+              onUpdateProjectDates={handleUpdateProjectDates}
            />
         ) : currentProject ? (
           <>
@@ -728,6 +755,7 @@ const App: React.FC = () => {
             />
             {viewMode === ViewMode.Gantt && (
               <GanttChartView 
+                key={currentProject.id}
                 tasks={currentProject.tasks} 
                 warnings={warnings} 
                 onDragTask={handleDragTask} 
@@ -738,9 +766,11 @@ const App: React.FC = () => {
               />
             )}
             {viewMode === ViewMode.Calendar && (
-              <CalendarView 
+              <CalendarView
+                key={currentProject.id}
                 tasks={currentProject.tasks}
                 projectStartDate={currentProject.startDate}
+                projectEndDate={currentProject.endDate}
                 warnings={warnings} 
                 onDragTask={handleDragTask} 
                 selectedTaskIds={selectedTaskIds}

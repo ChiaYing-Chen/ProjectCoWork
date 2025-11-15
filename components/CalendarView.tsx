@@ -1,8 +1,6 @@
-
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Task, Warning, TaskGroup, ExecutingUnit } from '../types';
 import DayViewModal from './DayViewModal';
-// FIX: Update date-fns imports for v3 compatibility.
 import {
   format,
   endOfMonth,
@@ -11,10 +9,10 @@ import {
   isSameMonth,
   isSameDay,
   addMonths,
+  getYear,
+  startOfMonth,
+  startOfWeek
 } from 'date-fns';
-import { startOfMonth } from 'date-fns/startOfMonth';
-import { startOfWeek } from 'date-fns/startOfWeek';
-import { subMonths } from 'date-fns/subMonths';
 import { zhTW } from 'date-fns/locale/zh-TW';
 
 interface CalendarTaskItemProps {
@@ -89,6 +87,7 @@ const CalendarTaskItem: React.FC<CalendarTaskItemProps> = ({ task, isSelected, i
 interface CalendarViewProps {
   tasks: Task[];
   projectStartDate: Date;
+  projectEndDate: Date;
   warnings: Warning[];
   onDragTask: (taskId: number, newStartDate: Date) => void;
   selectedTaskIds: number[];
@@ -104,28 +103,36 @@ interface CalendarViewProps {
   selectedUnits: string[];
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, selectedUnits }) => {
-  const initialMonth = startOfMonth(projectStartDate || new Date());
-  const [visibleMonths, setVisibleMonths] = useState([initialMonth]);
-  const [activeMonth, setActiveMonth] = useState(initialMonth);
+const YEAR_COLORS = ['#4f46e5', '#db2777', '#16a34a', '#d97706', '#6d28d9', '#0891b2', '#ca8a04', '#be185d'];
+
+
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, projectEndDate, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, selectedUnits }) => {
   const [touchedTaskIds, setTouchedTaskIds] = useState<Set<number>>(new Set());
   const [dayViewDate, setDayViewDate] = useState<Date | null>(null);
-  const loaderRef = useRef<HTMLDivElement>(null);
-  const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const activeMonthObserver = useRef<IntersectionObserver | null>(null);
   const touchStateRef = useRef({ touchedTaskIds: new Set<number>() });
   const longPressTimer = useRef<number | null>(null);
+  const today = useMemo(() => new Date(), []);
+
+  const allMonths = useMemo(() => {
+    const months = [];
+    if (!projectStartDate || !projectEndDate) {
+        return [];
+    }
+    let current = startOfMonth(projectStartDate);
+    const end = startOfMonth(projectEndDate);
+    while (current <= end) {
+        months.push(current);
+        current = addMonths(current, 1);
+    }
+    return months;
+  }, [projectStartDate, projectEndDate]);
 
   useEffect(() => {
     touchStateRef.current.touchedTaskIds = touchedTaskIds;
   }, [touchedTaskIds]);
 
-  // Reset calendar to project start date when project changes
   useEffect(() => {
-    const newInitialMonth = startOfMonth(projectStartDate || new Date());
-    setActiveMonth(newInitialMonth);
-    setVisibleMonths([newInitialMonth]);
     if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = 0;
     }
@@ -140,75 +147,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
         task.executingUnit && selectedUnits.includes(task.executingUnit)
     );
   }, [tasks, selectedUnits]);
-
-  // Observer to load more months when scrolling to the bottom.
-  // This effect runs after every render to ensure the observer is correctly set up
-  // with the right DOM elements.
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    const loaderElement = loaderRef.current;
-
-    // Only set up the observer if both the container and the loader element are available.
-    if (!scrollContainer || !loaderElement) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // If the loader element is intersecting with the scroll container, load the next month.
-        if (entries[0].isIntersecting) {
-          setVisibleMonths((prev) => {
-            const lastMonth = prev[prev.length - 1];
-            // Defensive check to avoid errors if the array is empty.
-            if (!lastMonth) return prev;
-            return [...prev, addMonths(lastMonth, 1)];
-          });
-        }
-      },
-      { 
-        root: scrollContainer, // Use the scrollable div as the viewport.
-        threshold: 0.1       // Trigger when 10% of the loader is visible.
-      }
-    );
-
-    observer.observe(loaderElement);
-
-    // The cleanup function is crucial. It runs before the next time the effect runs,
-    // or when the component unmounts. It prevents multiple observers on the same element.
-    return () => {
-      observer.disconnect();
-    };
-  }); // No dependency array, so the effect runs after every render, ensuring robustness.
-
-  // Observer to track which month is currently active in the viewport
-  useEffect(() => {
-    if (activeMonthObserver.current) {
-      activeMonthObserver.current.disconnect();
-    }
-  
-    activeMonthObserver.current = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
-            const monthId = (entry.target as HTMLDivElement).dataset.monthId;
-            if (monthId) {
-              const newActiveMonth = new Date(monthId);
-              setActiveMonth(currentActive => 
-                currentActive.getTime() !== newActiveMonth.getTime() ? newActiveMonth : currentActive
-              );
-            }
-          }
-        }
-      },
-      { root: scrollContainerRef.current, threshold: 0.5 }
-    );
-  
-    monthRefs.current.forEach((el) => {
-      activeMonthObserver.current?.observe(el);
-    });
-  
-    return () => activeMonthObserver.current?.disconnect();
-  }, [visibleMonths]); // Re-attach observers when new months are added
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: number) => {
     e.dataTransfer.setData('taskId', taskId.toString());
@@ -328,14 +266,29 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
       }
   };
 
+  const yearColorMap = useMemo(() => {
+    const map = new Map<number, string>();
+    let colorIndex = 0;
+    const sortedUniqueYears = [...new Set(allMonths.map(month => getYear(month)))].sort((a,b) => a-b);
+    
+    sortedUniqueYears.forEach(year => {
+      if (!map.has(year)) {
+        map.set(year, YEAR_COLORS[colorIndex % YEAR_COLORS.length]);
+        colorIndex++;
+      }
+    });
+    return map;
+  }, [allMonths]);
+
+  const sortedYears = useMemo(() => {
+    return Array.from(yearColorMap.keys()).sort((a, b) => a - b);
+  }, [yearColorMap]);
+
   return (
     <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 relative flex flex-col view-container">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 flex-shrink-0">
-        <h2 className="flex-shrink-0 text-xl sm:text-2xl font-bold text-slate-800 text-center mb-2 sm:mb-0">
-          {format(activeMonth, 'yyyy年 MMMM', { locale: zhTW })}
-        </h2>
-        
+      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center mb-4 flex-shrink-0 min-h-[40px]">
+        {/* The year/month title has been removed as per user request. */}
         <div className="w-full sm:w-auto flex justify-center sm:justify-end items-center space-x-2">
             {selectedTaskIds.length > 0 && (
                 <button
@@ -360,6 +313,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
         </div>
       </div>
       
+      {sortedYears.length > 1 && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
+            {sortedYears.map(year => (
+                <div key={year} className="flex items-center">
+                    <div className="w-4 h-4 rounded-sm mr-2" style={{ backgroundColor: yearColorMap.get(year) }}></div>
+                    <span className="text-sm font-semibold text-slate-600">{year}</span>
+                </div>
+            ))}
+        </div>
+      )}
+
       {(taskGroups.length > 0 || unitsInUse.length > 0) && (
         <div className="p-4 border-b border-t border-slate-200 bg-slate-50 space-y-4 mb-4 rounded-md flex-shrink-0">
             {taskGroups.length > 0 && (
@@ -392,7 +356,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
       )}
 
       <div 
-        className="flex-grow overflow-auto calendar-print-container" 
+        className="flex-grow overflow-y-auto calendar-print-container" 
         ref={scrollContainerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -403,54 +367,47 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
               <div key={day} className="py-2">{day}</div>
             ))}
         </div>
-        {visibleMonths.map(month => {
+        {allMonths.map(month => {
           const start = startOfWeek(startOfMonth(month));
           const end = endOfWeek(endOfMonth(month));
           const days = eachDayOfInterval({ start, end });
+          const year = getYear(month);
+          const yearColor = yearColorMap.get(year) || '#64748b';
 
           return (
-            <div 
-              key={format(month, 'yyyy-MM')} 
-              className="grid grid-cols-7"
-              data-month-id={month.toISOString()}
-              ref={el => {
-                if (el) monthRefs.current.set(month.toISOString(), el);
-                else monthRefs.current.delete(month.toISOString());
-              }}
-            >
-              {days.map(day => {
-                const dayKey = format(day, 'yyyy-MM-dd');
-                const dayTasks = tasksByDate.get(dayKey) || [];
+            <div key={format(month, 'yyyy-MM')} className="flex border-t border-slate-200">
+                <div className="w-4 flex-shrink-0" style={{ backgroundColor: yearColor }}>
+                </div>
+                <div 
+                  className="grid grid-cols-7 flex-grow"
+                >
+                  {days.map(day => {
+                    const dayKey = format(day, 'yyyy-MM-dd');
+                    const dayTasks = tasksByDate.get(dayKey) || [];
 
-                return (
-                  <div
-                    key={day.toString()}
-                    className={`border-b border-r border-slate-200 min-h-[120px] p-1.5 transition-colors duration-200 cursor-pointer ${!isSameMonth(day, month) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, new Date()) ? 'bg-blue-50' : ''}`}
-                    onDrop={(e) => handleDrop(e, day)}
-                    onDragOver={handleDragOver}
-                    onClick={(e) => handleDayClick(e, day)}
-                    onDoubleClick={(e) => {
-                       if (e.target === e.currentTarget) {
-                           onOpenAddTaskModal();
-                       }
-                    }}
-                    onTouchStart={() => handleDayTouchStart(day)}
-                    onTouchMove={handleDayTouchMove}
-                    onTouchEnd={handleDayTouchEnd}
-                  >
-                    <time dateTime={format(day, 'yyyy-MM-dd')} className={`text-sm ${isSameMonth(day, month) ? 'text-slate-700' : 'text-slate-400'}`}>
-                      {format(day, 'd')}
-                    </time>
-                    <div className="mt-1 space-y-1">
-                      {dayTasks.map(task => {
-                          const isSelected = selectedTaskIds.includes(task.id);
-                          const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
-                          const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
-                          return (
-                              <CalendarTaskItem
+                    return (
+                      <div
+                        key={day.toString()}
+                        className={`border-b border-l border-slate-200 min-h-[120px] p-1.5 transition-colors duration-200 cursor-pointer ${!isSameMonth(day, month) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, today) ? 'bg-blue-100' : ''}`}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, day)}
+                        onClick={(e) => handleDayClick(e, day)}
+                        onTouchStart={() => handleDayTouchStart(day)}
+                        onTouchMove={handleDayTouchMove}
+                        onTouchEnd={handleDayTouchEnd}
+                      >
+                        <div className={`text-sm ${!isSameMonth(day, month) ? 'text-slate-400' : 'text-slate-700'}`}>
+                          {format(day, 'd')}
+                        </div>
+                        <div className="mt-1 space-y-1">
+                          {dayTasks.map(task => {
+                            const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
+                            const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
+                            return (
+                              <CalendarTaskItem 
                                 key={task.id}
                                 task={task}
-                                isSelected={isSelected}
+                                isSelected={selectedTaskIds.includes(task.id)}
                                 isTouched={touchedTaskIds.has(task.id)}
                                 group={group}
                                 taskColor={taskColor}
@@ -459,24 +416,27 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
                                 onEditTask={onEditTask}
                                 onUngroupTask={onUngroupTask}
                               />
-                          );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
             </div>
           );
         })}
-        <div ref={loaderRef} className="h-10 text-center text-slate-500">載入更多...</div>
       </div>
-      <DayViewModal
-        date={dayViewDate}
-        onClose={() => setDayViewDate(null)}
+      <DayViewModal 
+        date={dayViewDate} 
+        onClose={() => setDayViewDate(null)} 
         tasks={filteredTasks}
         taskGroups={taskGroups}
         executingUnits={executingUnits}
-        onEditTask={onEditTask}
+        onEditTask={(task) => {
+          setDayViewDate(null);
+          onEditTask(task);
+        }}
       />
     </div>
   );

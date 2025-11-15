@@ -66,6 +66,7 @@ interface ProjectListViewProps {
   onDeleteProject: (projectId: string) => void;
   onExportProject: (projectId: string) => void;
   onUpdateProjectName: (projectId: string, newName: string) => void;
+  onUpdateProjectDates: (projectId: string, newStartDate: Date, newEndDate: Date) => void;
 }
 
 const ProjectListView: React.FC<ProjectListViewProps> = ({ 
@@ -73,7 +74,8 @@ const ProjectListView: React.FC<ProjectListViewProps> = ({
     onSelectProject, 
     onDeleteProject, 
     onExportProject,
-    onUpdateProjectName
+    onUpdateProjectName,
+    onUpdateProjectDates
 }) => {
 
   return (
@@ -94,9 +96,33 @@ const ProjectListView: React.FC<ProjectListViewProps> = ({
                     onSave={(newName) => onUpdateProjectName(project.id, newName)}
                     textClasses="text-xl font-bold text-slate-800 mb-2"
                   />
-                  <p className="text-sm text-slate-500 mb-4">
-                    {format(project.startDate, 'yyyy/MM/dd')} - {format(project.endDate, 'yyyy/MM/dd')}
-                  </p>
+                  <div className="text-sm text-slate-500 mb-4 flex items-center gap-1">
+                    <input
+                        type="date"
+                        value={format(project.startDate, 'yyyy-MM-dd')}
+                        onChange={(e) => {
+                            const newStartDate = new Date(e.target.value + 'T00:00:00'); // Prevent timezone issues
+                            if (!isNaN(newStartDate.getTime())) {
+                                onUpdateProjectDates(project.id, newStartDate, project.endDate);
+                            }
+                        }}
+                        className="bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded p-1 cursor-pointer"
+                        aria-label="專案開始日期"
+                    />
+                    <span>-</span>
+                    <input
+                        type="date"
+                        value={format(project.endDate, 'yyyy-MM-dd')}
+                        onChange={(e) => {
+                            const newEndDate = new Date(e.target.value + 'T00:00:00'); // Prevent timezone issues
+                            if (!isNaN(newEndDate.getTime())) {
+                                onUpdateProjectDates(project.id, project.startDate, newEndDate);
+                            }
+                        }}
+                        className="bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded p-1 cursor-pointer"
+                        aria-label="專案結束日期"
+                    />
+                  </div>
                   <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1 rounded-full w-fit">
                       <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
                           {project.tasks.length} 項任務
