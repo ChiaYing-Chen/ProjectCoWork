@@ -1,11 +1,15 @@
+
 import React, { useState } from 'react';
+import { ExecutingUnit } from '../types';
 
 interface ExecutingUnitManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  units: string[];
-  onUpdate: (newUnits: string[]) => void;
+  units: ExecutingUnit[];
+  onUpdate: (newUnits: ExecutingUnit[]) => void;
 }
+
+const UNIT_COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#c084fc', '#f87171', '#4ade80', '#fb923c', '#22d3ee', '#a3e635', '#818cf8'];
 
 const ExecutingUnitManagerModal: React.FC<ExecutingUnitManagerModalProps> = ({ isOpen, onClose, units, onUpdate }) => {
     const [newUnit, setNewUnit] = useState('');
@@ -13,14 +17,19 @@ const ExecutingUnitManagerModal: React.FC<ExecutingUnitManagerModalProps> = ({ i
     const handleAddUnit = (e: React.FormEvent) => {
         e.preventDefault();
         const trimmedUnit = newUnit.trim();
-        if (trimmedUnit && !units.includes(trimmedUnit)) {
-            onUpdate([...units, trimmedUnit]);
+        if (trimmedUnit && !units.some(u => u.name === trimmedUnit)) {
+            const newColor = UNIT_COLORS[units.length % UNIT_COLORS.length];
+            onUpdate([...units, { name: trimmedUnit, color: newColor }]);
             setNewUnit('');
         }
     };
 
     const handleDeleteUnit = (unitToDelete: string) => {
-        onUpdate(units.filter(unit => unit !== unitToDelete));
+        onUpdate(units.filter(unit => unit.name !== unitToDelete));
+    };
+    
+    const handleColorChange = (unitName: string, newColor: string) => {
+        onUpdate(units.map(unit => unit.name === unitName ? { ...unit, color: newColor } : unit));
     };
 
     if (!isOpen) {
@@ -31,22 +40,30 @@ const ExecutingUnitManagerModal: React.FC<ExecutingUnitManagerModalProps> = ({ i
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 transition-opacity" onClick={onClose}>
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg transform transition-all" onClick={e => e.stopPropagation()}>
                 <h2 className="text-2xl font-bold text-slate-800 mb-4">執行單位管理</h2>
-                <div className="mb-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="mb-4 max-h-60 overflow-y-auto pr-2 space-y-2">
                     {units.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                            {units.map(unit => (
-                                <span key={unit} className="flex items-center bg-slate-200 text-slate-700 text-sm font-medium px-3 py-1 rounded-full">
-                                    {unit}
-                                    <button
-                                        onClick={() => handleDeleteUnit(unit)}
-                                        className="ml-2 -mr-1 w-5 h-5 flex items-center justify-center bg-slate-400 hover:bg-slate-500 text-white rounded-full transition-colors"
-                                        aria-label={`刪除 ${unit}`}
-                                    >
-                                        &times;
-                                    </button>
-                                </span>
-                            ))}
-                        </div>
+                        units.map(unit => (
+                            <div key={unit.name} className="flex items-center justify-between bg-slate-100 p-2 rounded-md">
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="color"
+                                        value={unit.color}
+                                        onChange={(e) => handleColorChange(unit.name, e.target.value)}
+                                        className="w-8 h-8 rounded-md border-slate-300 cursor-pointer p-0"
+                                        style={{ appearance: 'none', backgroundColor: 'transparent', border: 'none' }}
+                                        title="點擊以變更顏色"
+                                    />
+                                    <span className="text-slate-700 font-medium">{unit.name}</span>
+                                </div>
+                                <button
+                                    onClick={() => handleDeleteUnit(unit.name)}
+                                    className="w-6 h-6 flex items-center justify-center bg-slate-400 hover:bg-red-500 text-white rounded-full transition-colors flex-shrink-0"
+                                    aria-label={`刪除 ${unit.name}`}
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        ))
                     ) : (
                         <p className="text-slate-500 text-sm py-4 text-center">尚未新增任何執行單位。</p>
                     )}

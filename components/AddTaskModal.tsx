@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Task } from '../types';
+import { Task, ExecutingUnit } from '../types';
 
 interface TaskFormModalProps {
   isOpen: boolean;
@@ -8,7 +8,7 @@ interface TaskFormModalProps {
   onSave: (taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; predecessorId?: number; notes?: string; }) => void;
   taskToEdit?: Task | null;
   tasks: Task[];
-  executingUnits: string[];
+  executingUnits: ExecutingUnit[];
   onDelete?: (taskId: number) => void;
 }
 
@@ -44,13 +44,13 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
         setEndDate(taskToEdit.end.toISOString().split('T')[0]);
         setPredecessorId(taskToEdit.predecessorId?.toString() || '');
         setNotes(taskToEdit.notes || '');
-        const unit = taskToEdit.executingUnit || '';
-        if (unit && !executingUnits.includes(unit)) {
+        const unitName = taskToEdit.executingUnit || '';
+        if (unitName && !executingUnits.some(u => u.name === unitName)) {
             setIsCustom(true);
-            setCustomUnit(unit);
+            setCustomUnit(unitName);
             setExecutingUnit('custom');
         } else {
-            setExecutingUnit(unit);
+            setExecutingUnit(unitName);
             setIsCustom(false);
             setCustomUnit('');
         }
@@ -157,7 +157,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
             >
               <option value="">未指派</option>
               {executingUnits.map(unit => (
-                <option key={unit} value={unit}>{unit}</option>
+                <option key={unit.name} value={unit.name}>{unit.name}</option>
               ))}
               <option value="custom">-- 自訂 --</option>
             </select>

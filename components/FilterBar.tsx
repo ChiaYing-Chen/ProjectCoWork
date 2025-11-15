@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { ExecutingUnit } from '../types';
 
 interface FilterBarProps {
-  executingUnits: string[];
+  executingUnits: ExecutingUnit[];
   selectedUnits: string[];
   onSelectedUnitsChange: (selected: string[]) => void;
 }
@@ -29,10 +30,10 @@ const FilterBar: React.FC<FilterBarProps> = ({ executingUnits, selectedUnits, on
         };
     }, [wrapperRef]);
     
-    const handleUnitToggle = (unit: string) => {
-        const newSelected = selectedUnits.includes(unit)
-            ? selectedUnits.filter(u => u !== unit)
-            : [...selectedUnits, unit];
+    const handleUnitToggle = (unitName: string) => {
+        const newSelected = selectedUnits.includes(unitName)
+            ? selectedUnits.filter(u => u !== unitName)
+            : [...selectedUnits, unitName];
         onSelectedUnitsChange(newSelected);
     };
 
@@ -41,11 +42,9 @@ const FilterBar: React.FC<FilterBarProps> = ({ executingUnits, selectedUnits, on
         setIsOpen(false);
     }
     
-    // FIX: Use a type guard to ensure TypeScript correctly infers the resulting array type as `string[]`, 
-    // resolving an issue where the `unit` parameter in the `map` function was being inferred as `unknown`.
-    const uniqueUnits = [...new Set(executingUnits)].filter((u): u is string => !!u); // Filter out empty/null units
+    const uniqueUnitNames = [...new Set(executingUnits.map(u => u.name))].filter((u): u is string => !!u);
 
-    if (uniqueUnits.length === 0) return null;
+    if (uniqueUnitNames.length === 0) return null;
 
     return (
         <div className="mb-4 flex justify-end">
@@ -71,15 +70,15 @@ const FilterBar: React.FC<FilterBarProps> = ({ executingUnits, selectedUnits, on
                             </button>
                         </div>
                         <div className="max-h-60 overflow-y-auto p-2">
-                            {uniqueUnits.map(unit => (
-                                <label key={unit} className="flex items-center px-2 py-2 rounded-md hover:bg-slate-100 cursor-pointer">
+                            {uniqueUnitNames.map(unitName => (
+                                <label key={unitName} className="flex items-center px-2 py-2 rounded-md hover:bg-slate-100 cursor-pointer">
                                     <input
                                         type="checkbox"
-                                        checked={selectedUnits.includes(unit)}
-                                        onChange={() => handleUnitToggle(unit)}
+                                        checked={selectedUnits.includes(unitName)}
+                                        onChange={() => handleUnitToggle(unitName)}
                                         className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                     />
-                                    <span className="ml-3 text-sm text-slate-700">{unit}</span>
+                                    <span className="ml-3 text-sm text-slate-700">{unitName}</span>
                                 </label>
                             ))}
                         </div>

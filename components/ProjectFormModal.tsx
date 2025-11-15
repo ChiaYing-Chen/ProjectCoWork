@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { format, addMonths } from 'date-fns';
+import { Project } from '../types';
 
 interface ProjectFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (name: string, startDate: Date, endDate: Date) => void;
+  projects: Project[];
 }
 
-const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ isOpen, onClose, onSave }) => {
+const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ isOpen, onClose, onSave, projects }) => {
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -24,17 +26,24 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ isOpen, onClose, on
   }, [isOpen]);
 
   const handleSubmit = () => {
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       setError('專案名稱不可為空。');
       return;
     }
+    
+    if (projects.some(p => p.name === trimmedName)) {
+      setError(`專案名稱 "${trimmedName}" 已存在，請使用不同的名稱。`);
+      return;
+    }
+
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (end < start) {
       setError('結束日期不可早於開始日期。');
       return;
     }
-    onSave(name.trim(), start, end);
+    onSave(trimmedName, start, end);
   };
 
   if (!isOpen) {

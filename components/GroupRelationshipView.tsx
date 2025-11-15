@@ -134,7 +134,7 @@ const GroupRelationshipView: React.FC<GroupRelationshipViewProps> = ({ tasks, ta
                     onDragStart={(e) => handleDragStart(e, task.id)}
                     onDragOver={(e) => handleDragOver(e, task.id)}
                     onDrop={(e) => handleDrop(e, group, task.id)}
-                    className={`flex items-center space-x-4 p-2 rounded-lg transition-all duration-200 group ${draggedItemId === task.id ? 'opacity-30' : ''} ${dragOverItemId === task.id ? 'bg-blue-50' : ''}`}
+                    className={`flex items-center flex-wrap sm:flex-nowrap gap-x-4 gap-y-2 p-2 rounded-lg transition-all duration-200 group ${draggedItemId === task.id ? 'opacity-30' : ''} ${dragOverItemId === task.id ? 'bg-blue-50' : ''}`}
                   >
                     <div className="w-8 flex-shrink-0 cursor-grab text-slate-400 group-hover:text-slate-600">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM13 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2h-2z" /></svg>

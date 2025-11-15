@@ -63,65 +63,25 @@ const EditableText: React.FC<{ value: string, onSave: (newValue: string) => void
 interface ProjectListViewProps {
   projects: Project[];
   onSelectProject: (projectId: string) => void;
-  onCreateProject: () => void;
   onDeleteProject: (projectId: string) => void;
   onExportProject: (projectId: string) => void;
-  onImportProject: (file: File) => void;
   onUpdateProjectName: (projectId: string, newName: string) => void;
 }
 
 const ProjectListView: React.FC<ProjectListViewProps> = ({ 
     projects, 
     onSelectProject, 
-    onCreateProject, 
     onDeleteProject, 
     onExportProject,
-    onImportProject,
     onUpdateProjectName
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-          onImportProject(file);
-      }
-      if (fileInputRef.current) {
-          fileInputRef.current.value = ''; // Reset file input to allow re-importing the same file
-      }
-  };
-
-  const handleImportClick = () => fileInputRef.current?.click();
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-slate-800">所有專案</h2>
-        <div className="flex items-center space-x-2">
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-            <button
-                onClick={handleImportClick}
-                className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300"
-            >
-              <ImportIcon />
-              匯入專案
-            </button>
-            <button
-              onClick={onCreateProject}
-              className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              建立新專案
-            </button>
-        </div>
-      </div>
-
       {projects.length === 0 ? (
          <div className="text-center py-20 bg-white rounded-lg shadow-md">
             <h2 className="text-2xl font-bold mb-4 text-slate-700">尚未建立任何專案</h2>
-            <p className="text-slate-500">點擊右上角的「建立新專案」或「匯入專案」按鈕來開始。</p>
+            <p className="text-slate-500">點擊上方的「建立新專案」或「匯入專案」按鈕來開始。</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

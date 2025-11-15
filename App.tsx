@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Task, ViewMode, Warning, TaskGroup, Project } from './types';
+import { Task, ViewMode, Warning, TaskGroup, Project, ExecutingUnit } from './types';
 import { parseMppFile } from './services/mppParser';
 import Header from './components/Header';
 import GanttChartView from './components/GanttChartView';
@@ -11,7 +11,6 @@ import GroupRelationshipView from './components/GroupRelationshipView';
 import ProjectListView from './components/ProjectListView';
 import ProjectFormModal from './components/ProjectFormModal';
 import SettingsModal from './components/SettingsModal';
-import ExecutingUnitManagerModal from './components/ExecutingUnitManagerModal';
 import FilterBar from './components/FilterBar';
 // FIX: Update date-fns imports for v3 compatibility.
 import { addDays, differenceInBusinessDays, differenceInDays } from 'date-fns';
@@ -21,6 +20,8 @@ interface NotificationState {
   message: string;
   type: 'success' | 'error' | 'info';
 }
+
+const UNIT_COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#c084fc', '#f87171', '#4ade80', '#fb923c', '#22d3ee', '#a3e635', '#818cf8'];
 
 // Helper to revive dates from JSON serialization
 const reviveDates = (project: any): Project => ({
@@ -77,12 +78,11 @@ const App: React.FC = () => {
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
 
-  const [executingUnits, setExecutingUnits] = useState<string[]>([]);
+  const [executingUnits, setExecutingUnits] = useState<ExecutingUnit[]>([]);
   
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [notification, setNotification] = useState<NotificationState | null>(null);
 
@@ -99,15 +99,37 @@ const App: React.FC = () => {
     try {
       const storedUnits = localStorage.getItem('project-scheduler-units');
       if (storedUnits) {
-        setExecutingUnits(JSON.parse(storedUnits));
+        const parsed = JSON.parse(storedUnits);
+        // Migration logic: check if it's the old string[] format
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+          const migratedUnits: ExecutingUnit[] = parsed.map((name, index) => ({
+            name,
+            color: UNIT_COLORS[index % UNIT_COLORS.length]
+          }));
+          setExecutingUnits(migratedUnits);
+          localStorage.setItem('project-scheduler-units', JSON.stringify(migratedUnits));
+        } else if (Array.isArray(parsed)) { // It's the new format
+          setExecutingUnits(parsed);
+        } else { // Data is corrupted or in an unknown format, reset to default
+          throw new Error("Invalid format in local storage");
+        }
       } else {
-        const defaultUnits = ['設計部', '開發部', '測試部', '產品部'];
+        const defaultUnits: ExecutingUnit[] = [
+          { name: "W521", color: "#34d399" },
+          { name: "W561", color: "#60a5fa" },
+          { name: "W562", color: "#fbbf24" },
+        ];
         setExecutingUnits(defaultUnits);
         localStorage.setItem('project-scheduler-units', JSON.stringify(defaultUnits));
       }
     } catch (e) {
-      console.error("無法載入執行單位:", e);
-      setExecutingUnits(['設計部', '開發部', '測試部', '產品部']);
+      console.error("無法載入執行單位，重設為預設值:", e);
+      const defaultUnits: ExecutingUnit[] = [
+        { name: "W521", color: "#34d399" },
+        { name: "W561", color: "#60a5fa" },
+        { name: "W562", color: "#fbbf24" },
+      ];
+      setExecutingUnits(defaultUnits);
     }
   }, []);
 
@@ -261,7 +283,7 @@ const App: React.FC = () => {
     
     checkForWarnings(updatedTasks);
     updateCurrentProject(() => ({ tasks: updatedTasks }));
-  }, [currentProject, checkForWarnings, modifierName]);
+  }, [currentProject, checkForWarnings]);
 
   const handleSelectTask = useCallback((taskId: number, isCtrlOrMetaKey: boolean) => {
     if (isCtrlOrMetaKey) {
@@ -303,14 +325,18 @@ const App: React.FC = () => {
 
     updateCurrentProject(() => ({ tasks: newTasks, taskGroups: newGroups }));
     setSelectedTaskIds([]);
-  }, [currentProject, selectedTaskIds, showNotification, modifierName]);
+  }, [currentProject, selectedTaskIds, showNotification]);
 
   const handleSaveTask = useCallback((taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; predecessorId?: number; notes?: string; }) => {
     if (!currentProject) return;
     
     // Add new executing unit to the list if it doesn't exist
-    if (taskData.executingUnit && !executingUnits.includes(taskData.executingUnit)) {
-        const newUnits = [...executingUnits, taskData.executingUnit];
+    if (taskData.executingUnit && !executingUnits.some(u => u.name === taskData.executingUnit)) {
+        const newUnit: ExecutingUnit = {
+          name: taskData.executingUnit,
+          color: UNIT_COLORS[executingUnits.length % UNIT_COLORS.length]
+        };
+        const newUnits = [...executingUnits, newUnit];
         setExecutingUnits(newUnits);
         localStorage.setItem('project-scheduler-units', JSON.stringify(newUnits));
     }
@@ -342,7 +368,7 @@ const App: React.FC = () => {
         return { tasks: newTasks };
     });
     setIsTaskFormOpen(false);
-  }, [currentProject, checkForWarnings, modifierName, executingUnits]);
+  }, [currentProject, checkForWarnings, executingUnits]);
 
   const handleUngroupTask = useCallback((taskIdToUngroup: number) => {
     if (!currentProject) return;
@@ -372,7 +398,7 @@ const App: React.FC = () => {
         setSelectedTaskIds(prev => prev.filter(id => id !== taskIdToUngroup));
         return { tasks: finalTasks, taskGroups: finalGroups };
     });
-  }, [currentProject, modifierName]);
+  }, [currentProject]);
 
   const handleDeleteTasks = useCallback((taskIdsToDelete: number[]) => {
     if (!currentProject) return;
@@ -424,7 +450,7 @@ const App: React.FC = () => {
       updateCurrentProject(proj => ({
           taskGroups: proj.taskGroups.map(g => g.id === groupId ? { ...g, ...updates } : g)
       }));
-  }, [modifierName]);
+  }, []);
 
   const handleUpdateTaskInterval = useCallback((groupId: string, previousTaskId: number, taskToShiftId: number, newInterval: number) => {
     if (!currentProject) return;
@@ -462,7 +488,7 @@ const App: React.FC = () => {
         checkForWarnings(newTasks);
         return { tasks: newTasks };
     });
-  }, [currentProject, checkForWarnings, modifierName]);
+  }, [currentProject, checkForWarnings]);
 
   const handleReorderGroupTasks = useCallback((groupId: string, newOrderedTaskIds: number[]) => {
       handleUpdateGroup(groupId, { taskIds: newOrderedTaskIds });
@@ -498,7 +524,7 @@ const App: React.FC = () => {
           checkForWarnings(newTasks);
           return { tasks: newTasks };
       });
-  }, [handleUpdateGroup, checkForWarnings, modifierName]);
+  }, [handleUpdateGroup, checkForWarnings]);
 
   const handleSaveProject = (name: string, startDate: Date, endDate: Date) => {
     const newProject: Project = {
@@ -527,6 +553,12 @@ const App: React.FC = () => {
   };
 
   const handleUpdateProjectName = useCallback((projectId: string, newName: string) => {
+    const isDuplicate = projects.some(p => p.name === newName && p.id !== projectId);
+    if (isDuplicate) {
+        showNotification(`專案名稱 "${newName}" 已存在，請更換一個名稱。`, 'error');
+        return; 
+    }
+
     const now = new Date();
     setProjects(prevProjects =>
       prevProjects.map(p =>
@@ -539,7 +571,7 @@ const App: React.FC = () => {
       )
     );
     showNotification('專案名稱已更新', 'success');
-  }, [modifierName, showNotification]);
+  }, [projects, modifierName, showNotification]);
 
   const handleDeleteGroup = (groupId: string) => {
     if (!currentProject) return;
@@ -575,25 +607,47 @@ const App: React.FC = () => {
     reader.onload = (event) => {
         try {
             const result = event.target?.result;
-            if (typeof result === 'string') {
-                const parsedProject = JSON.parse(result);
-                // Basic validation
-                if (parsedProject.id && parsedProject.name && Array.isArray(parsedProject.tasks)) {
-                    const revivedProject = reviveDates(parsedProject);
-                    // Avoid ID collision by assigning a new one if it exists
-                    if (projects.some(p => p.id === revivedProject.id)) {
+            if (typeof result !== 'string') {
+                throw new Error('無法讀取檔案內容。');
+            }
+            
+            const parsedProject = JSON.parse(result);
+            if (!parsedProject.id || !parsedProject.name || !Array.isArray(parsedProject.tasks)) {
+                throw new Error('無效的專案檔案格式。');
+            }
+
+            const revivedProject = reviveDates(parsedProject);
+            const existingProject = projects.find(p => p.name === revivedProject.name);
+
+            if (existingProject) {
+                if (window.confirm(`專案 "${revivedProject.name}" 已存在。您確定要覆蓋它嗎？`)) {
+                    // 處理因覆蓋而可能產生的ID衝突
+                    if (projects.some(p => p.id === revivedProject.id && p.id !== existingProject.id)) {
                         revivedProject.id = `proj-${Date.now()}`;
                         showNotification(`專案ID衝突，已為匯入的專案指派新ID。`, 'info');
                     }
-                    setProjects(prev => [...prev, revivedProject]);
-                    showNotification(`專案 "${revivedProject.name}" 匯入成功！`, 'success');
+                    
+                    setProjects(prev => {
+                        const projectsWithoutOld = prev.filter(p => p.id !== existingProject.id);
+                        return [...projectsWithoutOld, revivedProject];
+                    });
+                    showNotification(`專案 "${revivedProject.name}" 已成功覆蓋！`, 'success');
                 } else {
-                    throw new Error('無效的專案檔案格式。');
+                    showNotification('專案匯入已取消。', 'info');
                 }
+            } else {
+                // 處理無名稱衝突但可能有ID衝突的情況
+                if (projects.some(p => p.id === revivedProject.id)) {
+                    revivedProject.id = `proj-${Date.now()}`;
+                    showNotification(`專案ID衝突，已為匯入的專案指派新ID。`, 'info');
+                }
+                setProjects(prev => [...prev, revivedProject]);
+                showNotification(`專案 "${revivedProject.name}" 匯入成功！`, 'success');
             }
         } catch (error) {
             console.error("專案匯入失敗:", error);
-            showNotification("無法匯入專案檔案。請確認格式是否正確。", "error");
+            const message = error instanceof Error ? error.message : "請確認格式是否正確。";
+            showNotification(`無法匯入專案檔案。${message}`, "error");
         }
     };
     reader.onerror = () => {
@@ -611,10 +665,14 @@ const App: React.FC = () => {
         setStorageKey(newKey);
         setCurrentProjectId(null); 
     }
+    showNotification('設定已儲存', 'success');
   };
 
-  const handleUpdateExecutingUnits = useCallback((newUnits: string[]) => {
-    const uniqueUnits = [...new Set(newUnits)];
+  const handleUpdateExecutingUnits = useCallback((newUnits: ExecutingUnit[]) => {
+    // No need for unique check here as the modal should handle it, but good practice.
+    const uniqueUnits = newUnits.filter((unit, index, self) => 
+        index === self.findIndex((u) => u.name === unit.name)
+    );
     setExecutingUnits(uniqueUnits);
     try {
       localStorage.setItem('project-scheduler-units', JSON.stringify(uniqueUnits));
@@ -643,12 +701,13 @@ const App: React.FC = () => {
       <Header
         project={currentProject}
         onFileImport={handleFileImport}
+        onImportProject={handleProjectImport}
+        onCreateProject={() => setIsProjectFormOpen(true)}
         viewMode={viewMode}
         onSetViewMode={setViewMode}
         onBackToProjects={() => setCurrentProjectId(null)}
         onAddTask={openTaskFormForCreate}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenExecutingUnits={() => setIsUnitModalOpen(true)}
         onPrint={handlePrint}
       />
       <main className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -656,16 +715,14 @@ const App: React.FC = () => {
            <ProjectListView 
               projects={projects}
               onSelectProject={setCurrentProjectId}
-              onCreateProject={() => setIsProjectFormOpen(true)}
               onDeleteProject={handleDeleteProject}
               onExportProject={handleExportProject}
-              onImportProject={handleProjectImport}
               onUpdateProjectName={handleUpdateProjectName}
            />
         ) : currentProject ? (
           <>
             <FilterBar 
-              executingUnits={executingUnits.filter(u => currentProject.tasks.some(t => t.executingUnit === u))}
+              executingUnits={executingUnits.filter(u => currentProject.tasks.some(t => t.executingUnit === u.name))}
               selectedUnits={selectedUnits}
               onSelectedUnitsChange={handleSelectedUnitsChange}
             />
@@ -727,19 +784,20 @@ const App: React.FC = () => {
               setIsTaskFormOpen(false);
             }} 
         />}
-      {isProjectFormOpen && <ProjectFormModal isOpen={isProjectFormOpen} onClose={() => setIsProjectFormOpen(false)} onSave={handleSaveProject} />}
+      {isProjectFormOpen && <ProjectFormModal 
+            isOpen={isProjectFormOpen} 
+            onClose={() => setIsProjectFormOpen(false)} 
+            onSave={handleSaveProject} 
+            projects={projects}
+      />}
       <SettingsModal 
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onSave={handleSaveSettings}
         currentKey={storageKey}
         currentModifierName={modifierName}
-      />
-       <ExecutingUnitManagerModal 
-        isOpen={isUnitModalOpen}
-        onClose={() => setIsUnitModalOpen(false)}
-        units={executingUnits} 
-        onUpdate={handleUpdateExecutingUnits} 
+        units={executingUnits}
+        onUpdateUnits={handleUpdateExecutingUnits}
       />
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
     </div>

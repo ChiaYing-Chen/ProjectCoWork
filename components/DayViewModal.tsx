@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Task, TaskGroup } from '../types';
+import { Task, TaskGroup, ExecutingUnit } from '../types';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale/zh-TW';
 
@@ -31,9 +32,8 @@ interface DayViewModalProps {
   onClose: () => void;
   tasks: Task[];
   taskGroups: TaskGroup[];
-  executingUnits: string[];
+  executingUnits: ExecutingUnit[];
   onEditTask: (task: Task) => void;
-  getUnitColor: (unit: string, allUnits: string[]) => string;
 }
 
 const DayViewModal: React.FC<DayViewModalProps> = ({
@@ -43,7 +43,6 @@ const DayViewModal: React.FC<DayViewModalProps> = ({
   taskGroups,
   executingUnits,
   onEditTask,
-  getUnitColor
 }) => {
   if (!date) {
     return null;
@@ -53,6 +52,8 @@ const DayViewModal: React.FC<DayViewModalProps> = ({
 
   const taskGroupMap = new Map<string, TaskGroup>();
   taskGroups.forEach(group => taskGroupMap.set(group.id, group));
+
+  const unitColorMap = new Map(executingUnits.map(u => [u.name, u.color]));
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 transition-opacity" onClick={onClose}>
@@ -74,7 +75,7 @@ const DayViewModal: React.FC<DayViewModalProps> = ({
             <div className="space-y-2">
               {dayTasks.sort((a,b) => a.id - b.id).map(task => {
                   const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
-                  const taskColor = task.executingUnit ? getUnitColor(task.executingUnit, executingUnits) : undefined;
+                  const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
                   return (
                       <DayViewTaskItem
                           key={task.id}

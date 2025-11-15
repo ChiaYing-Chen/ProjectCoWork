@@ -7,6 +7,7 @@ export interface Project {
   taskGroups: TaskGroup[];
   lastModified?: Date;
   lastModifiedBy?: string;
+  executingUnits?: ExecutingUnit[]; // 雖然執行單位是全域的，但保留此欄位可相容舊的專案檔
 }
 
 export interface Task {
@@ -36,5 +37,10 @@ export interface TaskGroup {
   id: string;
   name?: string;
   taskIds: number[];
+  color: string;
+}
+
+export interface ExecutingUnit {
+  name: string;
   color: string;
 }

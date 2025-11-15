@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useRef } from 'react';
-import { Task, Warning, TaskGroup } from '../types';
+import { Task, Warning, TaskGroup, ExecutingUnit } from '../types';
 // FIX: Update date-fns imports for v3 compatibility.
 import { format, differenceInDays, addDays } from 'date-fns';
 import { startOfDay } from 'date-fns/startOfDay';
@@ -9,13 +9,6 @@ import { zhTW } from 'date-fns/locale/zh-TW';
 const ROW_HEIGHT = 40;
 const DAY_WIDTH = 40;
 const SIDEBAR_WIDTH = 250;
-const UNIT_COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#c084fc', '#f87171', '#4ade80', '#fb923c', '#22d3ee', '#a3e635', '#818cf8'];
-
-const getUnitColor = (unit: string, allUnits: string[]) => {
-    const index = allUnits.indexOf(unit);
-    if (index === -1) return '#a1a1aa'; // zinc-400 for unlisted units
-    return UNIT_COLORS[index % UNIT_COLORS.length];
-};
 
 interface GanttTaskBarProps {
   task: Task;
@@ -83,7 +76,7 @@ const GanttChartView: React.FC<{
   onDragTask: (taskId: number, newStartDate: Date) => void;
   taskGroups: TaskGroup[];
   onEditTask: (task: Task) => void;
-  executingUnits: string[];
+  executingUnits: ExecutingUnit[];
   selectedUnits: string[];
 }> = ({ tasks, warnings, onDragTask, taskGroups, onEditTask, executingUnits, selectedUnits }) => {
   const [timelineWidth, setTimelineWidth] = useState(2000);
@@ -144,14 +137,10 @@ const GanttChartView: React.FC<{
   };
 
   const unitColorMap = useMemo(() => {
-    const map = new Map<string, string>();
-    executingUnits.forEach(unit => {
-        map.set(unit, getUnitColor(unit, executingUnits));
-    });
-    return map;
+    return new Map(executingUnits.map(u => [u.name, u.color]));
   }, [executingUnits]);
 
-  const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u)), [executingUnits, tasks]);
+  const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u.name)), [executingUnits, tasks]);
 
   return (
     <div className="bg-white rounded-lg shadow-lg flex flex-col view-container">
@@ -175,9 +164,9 @@ const GanttChartView: React.FC<{
                     <h3 className="text-md font-semibold mb-2 text-slate-700">執行單位圖例</h3>
                     <div className="flex flex-wrap gap-x-6 gap-y-2">
                         {unitsInUse.map(unit => (
-                            <div key={unit} className="flex items-center">
-                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unitColorMap.get(unit) }}></div>
-                                <span className="text-sm text-slate-600">{unit}</span>
+                            <div key={unit.name} className="flex items-center">
+                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unit.color }}></div>
+                                <span className="text-sm text-slate-600">{unit.name}</span>
                             </div>
                         ))}
                     </div>

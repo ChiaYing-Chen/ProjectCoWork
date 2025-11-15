@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Task, Warning, TaskGroup } from '../types';
+import { Task, Warning, TaskGroup, ExecutingUnit } from '../types';
 import DayViewModal from './DayViewModal';
 // FIX: Update date-fns imports for v3 compatibility.
 import {
@@ -16,14 +16,6 @@ import { startOfMonth } from 'date-fns/startOfMonth';
 import { startOfWeek } from 'date-fns/startOfWeek';
 import { subMonths } from 'date-fns/subMonths';
 import { zhTW } from 'date-fns/locale/zh-TW';
-
-const UNIT_COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#c084fc', '#f87171', '#4ade80', '#fb923c', '#22d3ee', '#a3e635', '#818cf8'];
-
-const getUnitColor = (unit: string, allUnits: string[]) => {
-    const index = allUnits.indexOf(unit);
-    if (index === -1) return '#a1a1aa'; // zinc-400 for unlisted units
-    return UNIT_COLORS[index % UNIT_COLORS.length];
-};
 
 interface CalendarTaskItemProps {
   task: Task;
@@ -107,7 +99,7 @@ interface CalendarViewProps {
   onUngroupTask: (taskId: number) => void;
   taskGroups: TaskGroup[];
   onEditTask: (task: Task) => void;
-  executingUnits: string[];
+  executingUnits: ExecutingUnit[];
   onDeleteSelectedTasks: (taskIds: number[]) => void;
   selectedUnits: string[];
 }
@@ -149,28 +141,44 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
     );
   }, [tasks, selectedUnits]);
 
-  // Observer to load more months when scrolling to the bottom
+  // Observer to load more months when scrolling to the bottom.
+  // This effect runs after every render to ensure the observer is correctly set up
+  // with the right DOM elements.
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleMonths((prev) => [...prev, addMonths(prev[prev.length - 1], 1)]);
-        }
-      },
-      { root: scrollContainerRef.current, threshold: 0.1 }
-    );
+    const scrollContainer = scrollContainerRef.current;
+    const loaderElement = loaderRef.current;
 
-    const currentLoader = loaderRef.current;
-    if (currentLoader) {
-      observer.observe(currentLoader);
+    // Only set up the observer if both the container and the loader element are available.
+    if (!scrollContainer || !loaderElement) {
+      return;
     }
 
-    return () => {
-      if (currentLoader) {
-        observer.unobserve(currentLoader);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // If the loader element is intersecting with the scroll container, load the next month.
+        if (entries[0].isIntersecting) {
+          setVisibleMonths((prev) => {
+            const lastMonth = prev[prev.length - 1];
+            // Defensive check to avoid errors if the array is empty.
+            if (!lastMonth) return prev;
+            return [...prev, addMonths(lastMonth, 1)];
+          });
+        }
+      },
+      { 
+        root: scrollContainer, // Use the scrollable div as the viewport.
+        threshold: 0.1       // Trigger when 10% of the loader is visible.
       }
+    );
+
+    observer.observe(loaderElement);
+
+    // The cleanup function is crucial. It runs before the next time the effect runs,
+    // or when the component unmounts. It prevents multiple observers on the same element.
+    return () => {
+      observer.disconnect();
     };
-  }, []); // Runs only once
+  }); // No dependency array, so the effect runs after every render, ensuring robustness.
 
   // Observer to track which month is currently active in the viewport
   useEffect(() => {
@@ -309,14 +317,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
   }, [taskGroups]);
   
   const unitColorMap = useMemo(() => {
-    const map = new Map<string, string>();
-    executingUnits.forEach(unit => {
-        map.set(unit, getUnitColor(unit, executingUnits));
-    });
-    return map;
+    return new Map(executingUnits.map(u => [u.name, u.color]));
   }, [executingUnits]);
 
-  const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u)), [executingUnits, tasks]);
+  const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u.name)), [executingUnits, tasks]);
 
   const handleDeleteClick = () => {
       if (selectedTaskIds.length > 0) {
@@ -327,16 +331,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
   return (
     <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 relative flex flex-col view-container">
       {/* Header */}
-      <div className="flex justify-between items-center mb-4 flex-shrink-0">
-        <div className="flex-1 flex justify-start">
-           {/* Placeholder for alignment */}
-        </div>
-        
-        <h2 className="flex-shrink-0 text-xl sm:text-2xl font-bold text-slate-800 text-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 flex-shrink-0">
+        <h2 className="flex-shrink-0 text-xl sm:text-2xl font-bold text-slate-800 text-center mb-2 sm:mb-0">
           {format(activeMonth, 'yyyy年 MMMM', { locale: zhTW })}
         </h2>
         
-        <div className="flex-1 flex justify-end items-center space-x-2">
+        <div className="w-full sm:w-auto flex justify-center sm:justify-end items-center space-x-2">
             {selectedTaskIds.length > 0 && (
                 <button
                     onClick={handleDeleteClick}
@@ -380,9 +380,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
                     <h3 className="text-md font-semibold mb-2 text-slate-700">執行單位圖例</h3>
                     <div className="flex flex-wrap gap-x-6 gap-y-2">
                         {unitsInUse.map(unit => (
-                            <div key={unit} className="flex items-center">
-                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unitColorMap.get(unit) }}></div>
-                                <span className="text-sm text-slate-600">{unit}</span>
+                            <div key={unit.name} className="flex items-center">
+                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unit.color }}></div>
+                                <span className="text-sm text-slate-600">{unit.name}</span>
                             </div>
                         ))}
                     </div>
@@ -477,7 +477,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, wa
         taskGroups={taskGroups}
         executingUnits={executingUnits}
         onEditTask={onEditTask}
-        getUnitColor={getUnitColor}
       />
     </div>
   );

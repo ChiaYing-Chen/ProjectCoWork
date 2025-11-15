@@ -11,8 +11,9 @@ interface HeaderProps {
   onBackToProjects: () => void;
   onAddTask: () => void;
   onOpenSettings?: () => void;
-  onOpenExecutingUnits?: () => void;
   onPrint: () => void;
+  onCreateProject?: () => void;
+  onImportProject?: (file: File) => void;
 }
 
 const BackIcon: React.FC = () => (
@@ -21,8 +22,14 @@ const BackIcon: React.FC = () => (
     </svg>
 );
 
-const FileImportIcon: React.FC = () => (
+const MppImportIcon: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+  </svg>
+);
+
+const ImportIcon: React.FC = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
   </svg>
 );
@@ -31,6 +38,12 @@ const AddIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
+);
+
+const AddProjectIcon: React.FC = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+  </svg>
 );
 
 const PrintIcon: React.FC = () => (
@@ -58,12 +71,6 @@ const SettingsIcon: React.FC = () => (
     </svg>
 );
 
-const UserGroupIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.125-1.274-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.125-1.274.356-1.857m0 0a5.002 5.002 0 019.288 0M12 14a4 4 0 100-8 4 4 0 000 8z" />
-    </svg>
-);
-
 const ClockIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -76,8 +83,20 @@ const MoreIcon: React.FC = () => (
     </svg>
 );
 
-const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetViewMode, onBackToProjects, onAddTask, onOpenSettings, onOpenExecutingUnits, onPrint }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const Header: React.FC<HeaderProps> = ({ 
+    project, 
+    onFileImport, 
+    viewMode, 
+    onSetViewMode, 
+    onBackToProjects, 
+    onAddTask, 
+    onOpenSettings, 
+    onPrint,
+    onCreateProject,
+    onImportProject
+}) => {
+  const mppFileInputRef = useRef<HTMLInputElement>(null);
+  const projectFileInputRef = useRef<HTMLInputElement>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -93,36 +112,47 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
     };
   }, []);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMppFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       onFileImport(file);
     }
-     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+     if (mppFileInputRef.current) {
+        mppFileInputRef.current.value = '';
     }
   };
+  const handleMppImportClick = () => mppFileInputRef.current?.click();
+  
+  const handleProjectFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && onImportProject) {
+      onImportProject(file);
+    }
+     if (projectFileInputRef.current) {
+        projectFileInputRef.current.value = '';
+    }
+  };
+  const handleProjectImportClick = () => projectFileInputRef.current?.click();
 
-  const handleImportClick = () => fileInputRef.current?.click();
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-40">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 min-w-0">
             {project ? (
                <>
-                <button onClick={onBackToProjects} className="flex items-center text-slate-500 hover:text-blue-600 transition duration-300 p-2 -ml-2 rounded-full" title="返回專案列表">
+                <button onClick={onBackToProjects} className="flex items-center text-slate-500 hover:text-blue-600 transition duration-300 p-2 -ml-2 rounded-full flex-shrink-0" title="返回專案列表">
                     <BackIcon />
                 </button>
-                <div className="flex items-baseline space-x-4">
+                <div className="flex items-baseline space-x-4 min-w-0">
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-800 truncate">{project.name}</h1>
                     <div className="hidden md:flex items-center space-x-2 bg-slate-100 px-3 py-1 rounded-full">
                         <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-0.5 rounded-full">{project.tasks.length} 項任務</span>
                     </div>
                 </div>
                 {project.lastModified && (
-                    <div className="hidden lg:flex items-center space-x-2 text-xs text-slate-500 ml-4 border-l border-slate-200 pl-4">
+                    <div className="hidden lg:flex items-center space-x-2 text-xs text-slate-500 ml-4 border-l border-slate-200 pl-4 flex-shrink-0">
                         <ClockIcon />
                         <span>
                             最後更新: {format(project.lastModified, 'yyyy/MM/dd HH:mm')} 由 <strong>{project.lastModifiedBy}</strong>
@@ -131,77 +161,89 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
                 )}
                </>
             ) : (
-                <div className="flex items-center space-x-4">
-                    <h1 className="text-xl sm:text-2xl font-bold text-blue-600">專案管理</h1>
-                    <div className="flex items-center space-x-2">
-                         {onOpenExecutingUnits && (
-                            <button onClick={onOpenExecutingUnits} className="text-slate-500 hover:text-blue-600 transition duration-300" title="管理執行單位">
-                                <UserGroupIcon />
-                            </button>
-                        )}
-                        {onOpenSettings && (
-                            <button onClick={onOpenSettings} className="text-slate-500 hover:text-blue-600 transition duration-300" title="儲存設定">
-                                <SettingsIcon />
-                            </button>
-                        )}
-                    </div>
+                <div className="flex items-center space-x-2">
+                    <input type="file" ref={projectFileInputRef} onChange={handleProjectFileChange} className="hidden" accept=".json" />
+                    {onCreateProject &&
+                        <button
+                            onClick={onCreateProject}
+                            className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
+                        >
+                            <AddProjectIcon />
+                            建立新專案
+                        </button>
+                    }
+                    <button
+                        onClick={handleProjectImportClick}
+                        className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300"
+                    >
+                        <ImportIcon />
+                        匯入專案
+                    </button>
                 </div>
             )}
           </div>
-          {project && (
-            <div className="flex items-center space-x-2">
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".mpp" />
-                
-                <button onClick={handleImportClick} title="匯入 MPP 檔案" className="hidden md:flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
-                    <FileImportIcon />
-                    <span className="hidden sm:inline sm:ml-2">匯入</span>
-                </button>
-                 <button onClick={onAddTask} title="新增任務" className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
-                    <AddIcon />
-                    <span className="hidden sm:inline sm:ml-2">新增任務</span>
-                </button>
-                <button onClick={onPrint} title="列印" className="hidden md:flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
-                    <PrintIcon />
-                    <span className="hidden sm:inline sm:ml-2">列印</span>
-                </button>
+          <div className="flex items-center space-x-2">
+            {project && (
+                <>
+                    <input type="file" ref={mppFileInputRef} onChange={handleMppFileChange} className="hidden" accept=".mpp" />
+                    
+                    <button onClick={handleMppImportClick} title="匯入 MPP 檔案" className="hidden md:flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
+                        <MppImportIcon />
+                        <span className="hidden sm:inline sm:ml-2">匯入</span>
+                    </button>
+                    <button onClick={onAddTask} title="新增任務" className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
+                        <AddIcon />
+                        <span className="hidden sm:inline sm:ml-2">新增任務</span>
+                    </button>
+                    <button onClick={onPrint} title="列印" className="hidden md:flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
+                        <PrintIcon />
+                        <span className="hidden sm:inline sm:ml-2">列印</span>
+                    </button>
 
-                <div className="bg-slate-200 p-1 rounded-lg flex space-x-1">
-                    <button onClick={() => onSetViewMode(ViewMode.Gantt)} title="甘特圖" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Gantt ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                        <GanttIcon /><span className="hidden sm:inline sm:ml-2">甘特圖</span>
+                    <div className="bg-slate-200 p-1 rounded-lg flex space-x-1">
+                        <button onClick={() => onSetViewMode(ViewMode.Gantt)} title="甘特圖" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Gantt ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
+                            <GanttIcon /><span className="hidden sm:inline sm:ml-2">甘特圖</span>
+                        </button>
+                        <button onClick={() => onSetViewMode(ViewMode.Calendar)} title="月曆" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Calendar ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
+                            <CalendarIcon /><span className="hidden sm:inline sm:ml-2">月曆</span>
+                        </button>
+                        <button onClick={() => onSetViewMode(ViewMode.Group)} title="編輯關聯" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Group ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
+                            <GroupIcon /><span className="hidden sm:inline sm:ml-2">編輯關聯</span>
+                        </button>
+                    </div>
+                    
+                    {/* Mobile More Menu */}
+                    <div ref={menuRef} className="relative md:hidden">
+                        <button onClick={() => setIsMenuOpen(prev => !prev)} className="p-2 text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
+                            <MoreIcon />
+                        </button>
+                        {isMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-slate-200">
+                                <ul className="py-1">
+                                    <li>
+                                        <button onClick={() => { handleMppImportClick(); setIsMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                            <MppImportIcon /> <span className="ml-3">匯入 MPP</span>
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button onClick={() => { onPrint(); setIsMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                            <PrintIcon /> <span className="ml-3">列印</span>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+            <div className="flex items-center space-x-2 pl-2 border-l border-slate-200 ml-2">
+                {onOpenSettings && (
+                    <button onClick={onOpenSettings} className="text-slate-500 hover:text-blue-600 transition duration-300 p-2" title="設定">
+                        <SettingsIcon />
                     </button>
-                    <button onClick={() => onSetViewMode(ViewMode.Calendar)} title="月曆" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Calendar ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                        <CalendarIcon /><span className="hidden sm:inline sm:ml-2">月曆</span>
-                    </button>
-                    <button onClick={() => onSetViewMode(ViewMode.Group)} title="編輯關聯" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Group ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                        <GroupIcon /><span className="hidden sm:inline sm:ml-2">編輯關聯</span>
-                    </button>
-                </div>
-                
-                {/* Mobile More Menu */}
-                <div ref={menuRef} className="relative md:hidden">
-                    <button onClick={() => setIsMenuOpen(prev => !prev)} className="p-2 text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
-                        <MoreIcon />
-                    </button>
-                    {isMenuOpen && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-slate-200">
-                            <ul className="py-1">
-                                <li>
-                                    <button onClick={() => { handleImportClick(); setIsMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                                        <FileImportIcon /> <span className="ml-3">匯入 MPP</span>
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onClick={() => { onPrint(); setIsMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                                        <PrintIcon /> <span className="ml-3">列印</span>
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
-                    )}
-                </div>
-
+                )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </header>
