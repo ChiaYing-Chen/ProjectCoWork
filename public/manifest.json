@@ -1,7 +1,7 @@
 {
-  "name": "工作排程系統 (Project Scheduler)",
-  "short_name": "工作排程",
-  "description": "一個強大的工作排程系統，支援匯入 Microsoft Project (.mpp) 檔案，並提供月曆與甘特圖兩種檢視模式。",
+  "name": "專案管理工具",
+  "short_name": "專案管理",
+  "description": "透過月曆與甘特圖方式管理專案",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#f1f5f9",
