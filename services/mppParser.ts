@@ -14,15 +14,17 @@ export const parseMppFile = async (file: File): Promise<Task[]> => {
   today.setHours(0, 0, 0, 0);
 
   return [
-    { id: 1, name: '專案啟動與規劃', start: addDays(today, 0), end: addDays(today, 4), progress: 100, executingUnit: '產品部', notes: '這是專案的關鍵第一步，需要與所有利害關係人對齊目標。' },
-    { id: 2, name: '需求訪談與分析', start: addDays(today, 2), end: addDays(today, 7), progress: 85, predecessorId: 1, executingUnit: '產品部' },
-    { id: 3, name: '系統架構設計', start: addDays(today, 8), end: addDays(today, 12), progress: 60, predecessorId: 2, executingUnit: '開發部', notes: '重點在於設計可擴展且穩定的後端架構。' },
-    { id: 4, name: 'UI/UX 設計', start: addDays(today, 8), end: addDays(today, 15), progress: 75, predecessorId: 2, executingUnit: '設計部' },
-    { id: 5, name: '資料庫設計', start: addDays(today, 13), end: addDays(today, 18), progress: 40, predecessorId: 3, executingUnit: '開發部' },
-    { id: 6, name: '前端開發', start: addDays(today, 16), end: addDays(today, 28), progress: 20, predecessorId: 4, executingUnit: '開發部', notes: '採用 React 框架，並確保響應式設計。' },
-    { id: 7, name: '後端開發', start: addDays(today, 19), end: addDays(today, 30), progress: 15, predecessorId: 5, executingUnit: '開發部' },
-    { id: 8, name: '整合測試', start: addDays(today, 31), end: addDays(today, 35), progress: 0, predecessorId: 7, executingUnit: '測試部' },
-    { id: 9, name: '使用者驗收測試 (UAT)', start: addDays(today, 36), end: addDays(today, 39), progress: 0, predecessorId: 8, executingUnit: '測試部' },
-    { id: 10, name: '部署上線', start: addDays(today, 40), end: addDays(today, 40), progress: 0, predecessorId: 9, executingUnit: '開發部', notes: '上線前需完成最後的資料備份與伺服器檢查。' },
+    { id: 1, name: '停機前準備與安全會議', start: addDays(today, 0), end: addDays(today, 2), progress: 100, executingUnit: '工安部', notes: '確認所有停機程序與安全措施，完成危害辨識。' },
+    { id: 2, name: '鍋爐水牆與過熱器檢查', start: addDays(today, 3), end: addDays(today, 10), progress: 80, predecessorId: 1, executingUnit: '機械組', notes: '檢查管排磨損與洩漏情況，進行 NDT 檢測。' },
+    { id: 3, name: '空氣預熱器與風道檢查', start: addDays(today, 3), end: addDays(today, 8), progress: 90, predecessorId: 1, executingUnit: '機械組' },
+    { id: 4, name: '發電機拆解與內部檢查', start: addDays(today, 3), end: addDays(today, 12), progress: 70, predecessorId: 1, executingUnit: '電氣組', notes: '檢查轉子與定子線圈絕緣，清潔匯流排。' },
+    { id: 5, name: '燃燒器與點火系統檢修', start: addDays(today, 11), end: addDays(today, 15), progress: 50, predecessorId: 2, executingUnit: '儀控組', notes: '清潔並校正燃燒器噴嘴。' },
+    { id: 6, name: '安全閥與儀表校驗', start: addDays(today, 9), end: addDays(today, 14), progress: 60, predecessorId: 3, executingUnit: '儀控組' },
+    { id: 7, name: '勵磁系統檢查與測試', start: addDays(today, 13), end: addDays(today, 18), progress: 40, predecessorId: 4, executingUnit: '電氣組' },
+    { id: 8, name: '保護電驛測試', start: addDays(today, 19), end: addDays(today, 22), progress: 10, predecessorId: 7, executingUnit: '電氣組' },
+    { id: 9, name: '發電機回裝與對心', start: addDays(today, 23), end: addDays(today, 28), progress: 0, predecessorId: 8, executingUnit: '檢修協力廠' },
+    { id: 10, name: '系統復原與啟動前檢查', start: addDays(today, 29), end: addDays(today, 32), progress: 0, predecessorId: 5, executingUnit: '運轉部' },
+    { id: 11, name: '點火升溫與併聯測試', start: addDays(today, 33), end: addDays(today, 35), progress: 0, predecessorId: 9, executingUnit: '運轉部' },
+    { id: 12, name: '滿載性能測試', start: addDays(today, 36), end: addDays(today, 38), progress: 0, predecessorId: 11, executingUnit: '運轉部', notes: '測試完成後提交大修報告。' },
   ];
 };

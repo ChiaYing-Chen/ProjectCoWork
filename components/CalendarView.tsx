@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Task, Warning, TaskGroup, ExecutingUnit } from '../types';
 import DayViewModal from './DayViewModal';
@@ -9,7 +11,6 @@ import {
   isSameMonth,
   isSameDay,
   addMonths,
-  getYear,
   startOfMonth,
   startOfWeek
 } from 'date-fns';
@@ -100,19 +101,21 @@ interface CalendarViewProps {
   onEditTask: (task: Task) => void;
   executingUnits: ExecutingUnit[];
   onDeleteSelectedTasks: (taskIds: number[]) => void;
-  selectedUnits: string[];
 }
 
-const YEAR_COLORS = ['#4f46e5', '#db2777', '#16a34a', '#d97706', '#6d28d9', '#0891b2', '#ca8a04', '#be185d'];
+const MONTH_COLORS = ['#4f46e5', '#db2777', '#16a34a', '#d97706', '#6d28d9', '#0891b2', '#ca8a04', '#be185d'];
 
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, projectEndDate, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, selectedUnits }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, projectEndDate, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks }) => {
   const [touchedTaskIds, setTouchedTaskIds] = useState<Set<number>>(new Set());
   const [dayViewDate, setDayViewDate] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const touchStateRef = useRef({ touchedTaskIds: new Set<number>() });
   const longPressTimer = useRef<number | null>(null);
   const today = useMemo(() => new Date(), []);
+  
+  const [deselectedUnits, setDeselectedUnits] = useState<Set<string>>(new Set());
+  const [deselectedMonths, setDeselectedMonths] = useState<Set<string>>(new Set());
 
   const allMonths = useMemo(() => {
     const months = [];
@@ -138,15 +141,35 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
     }
   }, [projectStartDate]);
 
+  const handleToggleUnit = (unitName: string) => {
+    setDeselectedUnits(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(unitName)) {
+        newSet.delete(unitName);
+      } else {
+        newSet.add(unitName);
+      }
+      return newSet;
+    });
+  };
+
+  const handleToggleMonth = (monthKey: string) => {
+    setDeselectedMonths(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(monthKey)) {
+        newSet.delete(monthKey);
+      } else {
+        newSet.add(monthKey);
+      }
+      return newSet;
+    });
+  };
 
   const filteredTasks = useMemo(() => {
-    if (selectedUnits.length === 0) {
-        return tasks;
-    }
     return tasks.filter(task => 
-        task.executingUnit && selectedUnits.includes(task.executingUnit)
+        !task.executingUnit || !deselectedUnits.has(task.executingUnit)
     );
-  }, [tasks, selectedUnits]);
+  }, [tasks, deselectedUnits]);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: number) => {
     e.dataTransfer.setData('taskId', taskId.toString());
@@ -266,88 +289,52 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
       }
   };
 
-  const yearColorMap = useMemo(() => {
-    const map = new Map<number, string>();
-    let colorIndex = 0;
-    const sortedUniqueYears = [...new Set(allMonths.map(month => getYear(month)))].sort((a,b) => a-b);
-    
-    sortedUniqueYears.forEach(year => {
-      if (!map.has(year)) {
-        map.set(year, YEAR_COLORS[colorIndex % YEAR_COLORS.length]);
-        colorIndex++;
+  const monthColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    allMonths.forEach((month, index) => {
+      const key = format(month, 'yyyy-MM');
+      if (!map.has(key)) {
+        map.set(key, MONTH_COLORS[index % MONTH_COLORS.length]);
       }
     });
     return map;
   }, [allMonths]);
 
-  const sortedYears = useMemo(() => {
-    return Array.from(yearColorMap.keys()).sort((a, b) => a - b);
-  }, [yearColorMap]);
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 relative flex flex-col view-container">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center mb-4 flex-shrink-0 min-h-[40px]">
-        {/* The year/month title has been removed as per user request. */}
-        <div className="w-full sm:w-auto flex justify-center sm:justify-end items-center space-x-2">
-            {selectedTaskIds.length > 0 && (
-                <button
-                    onClick={handleDeleteClick}
-                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 text-sm flex items-center"
-                    title="刪除選取的任務"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    刪除
-                </button>
-            )}
-             {selectedTaskIds.length > 1 && (
-                <button
-                    onClick={onCreateGroup}
-                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 text-sm flex items-center"
-                    title="將選取的任務建立時間關聯"
-                >
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" /></svg>
-                    關聯
-                </button>
-            )}
-        </div>
-      </div>
-      
-      {sortedYears.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
-            {sortedYears.map(year => (
-                <div key={year} className="flex items-center">
-                    <div className="w-4 h-4 rounded-sm mr-2" style={{ backgroundColor: yearColorMap.get(year) }}></div>
-                    <span className="text-sm font-semibold text-slate-600">{year}</span>
-                </div>
-            ))}
-        </div>
-      )}
-
-      {(taskGroups.length > 0 || unitsInUse.length > 0) && (
-        <div className="p-4 border-b border-t border-slate-200 bg-slate-50 space-y-4 mb-4 rounded-md flex-shrink-0">
-            {taskGroups.length > 0 && (
-                <div>
-                    <h3 className="text-md font-semibold mb-2 text-slate-700">時間關聯群組圖例</h3>
-                    <div className="flex flex-wrap gap-x-6 gap-y-2">
-                        {taskGroups.map((group, index) => (
-                            <div key={group.id} className="flex items-center">
-                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: group.color }}></div>
-                                <span className="text-sm text-slate-600">{group.name || `群組 ${index + 1}`}</span>
-                            </div>
+    <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 relative view-container">
+      {(unitsInUse.length > 0 || allMonths.length > 0) && (
+        <div className="p-4 border-b border-t border-slate-200 bg-slate-50 mb-2 rounded-md flex-shrink-0 flex">
+            {/* Left Side: Months */}
+            {allMonths.length > 0 && (
+                <div className="w-1/4 pr-4 flex-shrink-0">
+                    <div className="flex flex-col space-y-2">
+                        {Array.from(monthColorMap.entries()).map(([monthKey, color]) => (
+                            <button key={monthKey} className="flex items-center cursor-pointer p-1 rounded-md hover:bg-slate-200 transition-colors text-left" onClick={() => handleToggleMonth(monthKey)}>
+                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner flex-shrink-0" style={{ backgroundColor: color }}></div>
+                                <span className={`text-sm text-slate-600 ${deselectedMonths.has(monthKey) ? 'line-through text-slate-400' : ''}`}>
+                                    {format(new Date(monthKey + '-01T00:00:00'), 'yyyy / M', { locale: zhTW })}
+                                </span>
+                            </button>
                         ))}
                     </div>
                 </div>
             )}
+
+            {/* Divider */}
+            {allMonths.length > 0 && unitsInUse.length > 0 && (
+                <div className="border-l border-slate-200"></div>
+            )}
+
+            {/* Right Side: Units */}
             {unitsInUse.length > 0 && (
-                 <div>
-                    <h3 className="text-md font-semibold mb-2 text-slate-700">執行單位圖例</h3>
+                <div className={`flex-1 ${allMonths.length > 0 ? 'pl-4' : ''}`}>
                     <div className="flex flex-wrap gap-x-6 gap-y-2">
                         {unitsInUse.map(unit => (
-                            <div key={unit.name} className="flex items-center">
+                            <button key={unit.name} className="flex items-center cursor-pointer p-1 rounded-md hover:bg-slate-200 transition-colors" onClick={() => handleToggleUnit(unit.name)}>
                                 <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unit.color }}></div>
-                                <span className="text-sm text-slate-600">{unit.name}</span>
-                            </div>
+                                <span className={`text-sm text-slate-600 ${deselectedUnits.has(unit.name) ? 'line-through text-slate-400' : ''}`}>{unit.name}</span>
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -355,28 +342,62 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         </div>
       )}
 
-      <div 
-        className="flex-grow overflow-y-auto calendar-print-container" 
+      <div
+        className="overflow-y-auto calendar-print-container"
+        style={{ maxHeight: 'calc(100vh - 240px)' }}
         ref={scrollContainerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="grid grid-cols-7 text-center font-bold text-slate-600 sticky top-0 bg-white z-10 border-b-2 border-slate-200">
-            {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-              <div key={day} className="py-2">{day}</div>
-            ))}
+        {/* Combined Sticky Header and Action Menu */}
+        <div className="sticky top-0 bg-white z-20 border-b-2 border-slate-200">
+          <div className="relative">
+            {/* Action Menu */}
+            {selectedTaskIds.length > 0 && (
+                <div className="absolute top-1/2 -translate-y-1/2 right-4 z-10">
+                  <div className="bg-white p-2 rounded-lg shadow-lg flex items-center space-x-2 border border-slate-200">
+                      <button
+                          onClick={handleDeleteClick}
+                          className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center"
+                          title="刪除選取的任務"
+                      >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          刪除
+                      </button>
+                      {selectedTaskIds.length > 1 && (
+                          <button
+                              onClick={onCreateGroup}
+                              className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center"
+                              title="將選取的任務建立時間關聯"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" /></svg>
+                              關聯
+                          </button>
+                      )}
+                  </div>
+                </div>
+            )}
+            {/* Weekday Header */}
+            <div className="grid grid-cols-7 text-center font-bold text-slate-600">
+                {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+                  <div key={day} className="py-2">{day}</div>
+                ))}
+            </div>
+          </div>
         </div>
-        {allMonths.map(month => {
+
+        {allMonths.filter(month => !deselectedMonths.has(format(month, 'yyyy-MM'))).map(month => {
           const start = startOfWeek(startOfMonth(month));
           const end = endOfWeek(endOfMonth(month));
           const days = eachDayOfInterval({ start, end });
-          const year = getYear(month);
-          const yearColor = yearColorMap.get(year) || '#64748b';
+          const monthKey = format(month, 'yyyy-MM');
+          const monthColor = monthColorMap.get(monthKey) || '#64748b';
 
           return (
-            <div key={format(month, 'yyyy-MM')} className="flex border-t border-slate-200">
-                <div className="w-4 flex-shrink-0" style={{ backgroundColor: yearColor }}>
+            <div key={monthKey} className="flex border-t border-slate-200">
+                <div className="w-4 flex-shrink-0" style={{ backgroundColor: monthColor }}>
+                   {/* This is the vertical color bar, now without text. */}
                 </div>
                 <div 
                   className="grid grid-cols-7 flex-grow"
@@ -397,7 +418,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                         onTouchEnd={handleDayTouchEnd}
                       >
                         <div className={`text-sm ${!isSameMonth(day, month) ? 'text-slate-400' : 'text-slate-700'}`}>
-                          {format(day, 'M/d')}
+                          {format(day, 'd')}
                         </div>
                         <div className="mt-1 space-y-1">
                           {dayTasks.map(task => {

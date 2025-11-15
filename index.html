@@ -28,8 +28,19 @@
 </script>
 <style>
   @media print {
+    @page {
+      size: landscape;
+      margin: 1cm;
+    }
+
     /* Hide elements that should not be printed */
-    header {
+    header,
+    .fixed, /* Hides all modals and notifications */
+    .view-container > div:first-child, /* Hides filter bars in both views */
+    .calendar-print-container .sticky .absolute, /* Calendar action menu */
+    [data-task-id] button, /* Calendar ungroup button */
+    .calendar-print-container .w-4.flex-shrink-0 /* Calendar month color bar */
+    {
       display: none !important;
     }
     
@@ -38,6 +49,7 @@
       background-color: white !important;
       margin: 0;
       padding: 0;
+      font-size: 9pt;
     }
     
     main.container {
@@ -70,6 +82,31 @@
     }
     .calendar-print-container .sticky {
         position: static !important;
+        border-bottom: 1px solid #ddd !important;
+    }
+
+    /* Make day cells flexible height */
+    .calendar-print-container .grid-cols-7 > div {
+        min-height: 1px !important;
+        height: auto;
+        padding: 4px !important;
+        page-break-inside: avoid;
+    }
+
+    /* Show full task name */
+    .calendar-print-container .truncate {
+        overflow: visible !important;
+        white-space: normal !important;
+        text-overflow: initial !important;
+        word-break: break-all;
+    }
+
+    /* Style task items for printing */
+    .calendar-print-container [data-task-id] {
+        padding: 2px 4px !important;
+        font-size: 8pt !important;
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
     }
   }
 </style>

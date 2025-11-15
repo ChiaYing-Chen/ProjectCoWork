@@ -57,7 +57,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleDeleteUnit = (unitToDelete: string) => {
+    if (window.confirm(`您確定要刪除執行單位 "${unitToDelete}" 嗎？`)) {
       onUpdateUnits(units.filter(unit => unit.name !== unitToDelete));
+    }
   };
   
   const handleColorChange = (unitName: string, newColor: string) => {

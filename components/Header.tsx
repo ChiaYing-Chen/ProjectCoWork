@@ -77,12 +77,6 @@ const ClockIcon: React.FC = () => (
     </svg>
 );
 
-const MoreIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
-    </svg>
-);
-
 const Header: React.FC<HeaderProps> = ({ 
     project, 
     onFileImport, 
@@ -97,13 +91,13 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const mppFileInputRef = useRef<HTMLInputElement>(null);
   const projectFileInputRef = useRef<HTMLInputElement>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [isViewModeMenuOpen, setIsViewModeMenuOpen] = useState(false);
+  const viewModeMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false);
+      if (viewModeMenuRef.current && !viewModeMenuRef.current.contains(event.target as Node)) {
+        setIsViewModeMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -134,6 +128,13 @@ const Header: React.FC<HeaderProps> = ({
   };
   const handleProjectImportClick = () => projectFileInputRef.current?.click();
 
+  const viewModeOptions = {
+    [ViewMode.Gantt]: { label: '甘特圖', icon: <GanttIcon /> },
+    [ViewMode.Calendar]: { label: '月曆', icon: <CalendarIcon /> },
+    [ViewMode.Group]: { label: '編輯關聯', icon: <GroupIcon /> },
+  };
+
+  const currentView = viewModeOptions[viewMode];
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-40">
@@ -187,7 +188,7 @@ const Header: React.FC<HeaderProps> = ({
                 <>
                     <input type="file" ref={mppFileInputRef} onChange={handleMppFileChange} className="hidden" accept=".mpp" />
                     
-                    <button onClick={handleMppImportClick} title="匯入 MPP 檔案" className="hidden md:flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
+                    <button onClick={handleMppImportClick} title="匯入 MPP 檔案" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
                         <MppImportIcon />
                         <span className="hidden sm:inline sm:ml-2">匯入</span>
                     </button>
@@ -195,41 +196,44 @@ const Header: React.FC<HeaderProps> = ({
                         <AddIcon />
                         <span className="hidden sm:inline sm:ml-2">新增任務</span>
                     </button>
-                    <button onClick={onPrint} title="列印" className="hidden md:flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
+                    <button onClick={onPrint} title="列印" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
                         <PrintIcon />
                         <span className="hidden sm:inline sm:ml-2">列印</span>
                     </button>
 
-                    <div className="bg-slate-200 p-1 rounded-lg flex space-x-1">
-                        <button onClick={() => onSetViewMode(ViewMode.Gantt)} title="甘特圖" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Gantt ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                            <GanttIcon /><span className="hidden sm:inline sm:ml-2">甘特圖</span>
+                    <div className="relative" ref={viewModeMenuRef}>
+                        <button
+                            onClick={() => setIsViewModeMenuOpen(prev => !prev)}
+                            className="flex items-center bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-sm min-w-[50px] sm:min-w-[120px] justify-center sm:justify-between"
+                            aria-haspopup="true"
+                            aria-expanded={isViewModeMenuOpen}
+                        >
+                            <div className="flex items-center">
+                                {currentView.icon}
+                                <span className="ml-2 hidden sm:inline">{currentView.label}</span>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-0 sm:ml-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
                         </button>
-                        <button onClick={() => onSetViewMode(ViewMode.Calendar)} title="月曆" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Calendar ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                            <CalendarIcon /><span className="hidden sm:inline sm:ml-2">月曆</span>
-                        </button>
-                        <button onClick={() => onSetViewMode(ViewMode.Group)} title="編輯關聯" className={`flex items-center p-2 sm:px-3 sm:py-1 rounded-md text-sm font-semibold transition ${viewMode === ViewMode.Group ? 'bg-white text-blue-600 shadow' : 'bg-transparent text-slate-600'}`}>
-                            <GroupIcon /><span className="hidden sm:inline sm:ml-2">編輯關聯</span>
-                        </button>
-                    </div>
-                    
-                    {/* Mobile More Menu */}
-                    <div ref={menuRef} className="relative md:hidden">
-                        <button onClick={() => setIsMenuOpen(prev => !prev)} className="p-2 text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
-                            <MoreIcon />
-                        </button>
-                        {isMenuOpen && (
+                        {isViewModeMenuOpen && (
                             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-slate-200">
-                                <ul className="py-1">
-                                    <li>
-                                        <button onClick={() => { handleMppImportClick(); setIsMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                                            <MppImportIcon /> <span className="ml-3">匯入 MPP</span>
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button onClick={() => { onPrint(); setIsMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                                            <PrintIcon /> <span className="ml-3">列印</span>
-                                        </button>
-                                    </li>
+                                <ul className="py-1" role="menu">
+                                    {(Object.keys(viewModeOptions) as ViewMode[]).map((mode) => (
+                                        <li key={mode}>
+                                            <button
+                                                onClick={() => {
+                                                    onSetViewMode(mode);
+                                                    setIsViewModeMenuOpen(false);
+                                                }}
+                                                className={`w-full text-left flex items-center px-4 py-2 text-sm ${viewMode === mode ? 'font-bold text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-slate-100'}`}
+                                                role="menuitem"
+                                            >
+                                                {viewModeOptions[mode].icon}
+                                                <span className="ml-3">{viewModeOptions[mode].label}</span>
+                                            </button>
+                                        </li>
+                                    ))}
                                 </ul>
                             </div>
                         )}

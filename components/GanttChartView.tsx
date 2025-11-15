@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useState, useRef } from 'react';
 import { Task, Warning, TaskGroup, ExecutingUnit } from '../types';
 // FIX: Update date-fns imports for v3 compatibility.
@@ -8,7 +9,6 @@ import { zhTW } from 'date-fns/locale/zh-TW';
 
 const ROW_HEIGHT = 40;
 const DAY_WIDTH = 40;
-const SIDEBAR_WIDTH = 250;
 
 interface GanttTaskBarProps {
   task: Task;
@@ -77,23 +77,36 @@ const GanttChartView: React.FC<{
   taskGroups: TaskGroup[];
   onEditTask: (task: Task) => void;
   executingUnits: ExecutingUnit[];
-  selectedUnits: string[];
-}> = ({ tasks, warnings, onDragTask, taskGroups, onEditTask, executingUnits, selectedUnits }) => {
+}> = ({ tasks, warnings, onDragTask, taskGroups, onEditTask, executingUnits }) => {
   const [timelineWidth, setTimelineWidth] = useState(2000);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [deselectedUnits, setDeselectedUnits] = useState<Set<string>>(new Set());
+
+  const handleToggleUnit = (unitName: string) => {
+    setDeselectedUnits(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(unitName)) {
+        newSet.delete(unitName);
+      } else {
+        newSet.add(unitName);
+      }
+      return newSet;
+    });
+  };
 
   const filteredTasks = useMemo(() => {
-    if (selectedUnits.length === 0) {
-        return tasks;
-    }
     return tasks.filter(task => 
-        task.executingUnit && selectedUnits.includes(task.executingUnit)
+        !task.executingUnit || !deselectedUnits.has(task.executingUnit)
     );
-  }, [tasks, selectedUnits]);
+  }, [tasks, deselectedUnits]);
+  
+  const sortedTasks = useMemo(() => {
+      return filteredTasks.slice().sort((a,b) => a.start.getTime() - b.start.getTime() || a.id - b.id);
+  }, [filteredTasks]);
 
   const visualIndexMap = useMemo(() => {
-    return new Map<number, number>(filteredTasks.map((t, i) => [t.id, i]));
-  }, [filteredTasks]);
+    return new Map<number, number>(sortedTasks.map((t, i) => [t.id, i]));
+  }, [sortedTasks]);
   
   const { startDate, totalDays } = useMemo(() => {
     if (tasks.length === 0) {
@@ -144,52 +157,23 @@ const GanttChartView: React.FC<{
 
   return (
     <div className="bg-white rounded-lg shadow-lg flex flex-col view-container">
-      {(taskGroups.length > 0 || unitsInUse.length > 0) && (
-        <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-4 rounded-t-lg">
-            {taskGroups.length > 0 && (
-                <div>
-                    <h3 className="text-md font-semibold mb-2 text-slate-700">時間關聯群組圖例</h3>
-                    <div className="flex flex-wrap gap-x-6 gap-y-2">
-                        {taskGroups.map((group, index) => (
-                            <div key={group.id} className="flex items-center">
-                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ borderLeft: `4px solid ${group.color}` }}></div>
-                                <span className="text-sm text-slate-600">{group.name || `群組 ${index + 1}`}</span>
-                            </div>
-                        ))}
-                    </div>
+      {unitsInUse.length > 0 && (
+        <div className="p-4 border-b border-slate-200 bg-slate-50 rounded-t-lg flex">
+            {/* Units */}
+            <div className="flex-1">
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {unitsInUse.map(unit => (
+                        <button key={unit.name} className="flex items-center cursor-pointer p-1 rounded-md hover:bg-slate-200 transition-colors" onClick={() => handleToggleUnit(unit.name)}>
+                            <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unit.color }}></div>
+                            <span className={`text-sm text-slate-600 ${deselectedUnits.has(unit.name) ? 'line-through text-slate-400' : ''}`}>{unit.name}</span>
+                        </button>
+                    ))}
                 </div>
-            )}
-            {unitsInUse.length > 0 && (
-                 <div>
-                    <h3 className="text-md font-semibold mb-2 text-slate-700">執行單位圖例</h3>
-                    <div className="flex flex-wrap gap-x-6 gap-y-2">
-                        {unitsInUse.map(unit => (
-                            <div key={unit.name} className="flex items-center">
-                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unit.color }}></div>
-                                <span className="text-sm text-slate-600">{unit.name}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            </div>
         </div>
       )}
       <div className="overflow-x-auto gantt-print-container">
-        <div className="flex" style={{ width: SIDEBAR_WIDTH + timelineWidth }}>
-          {/* Sidebar */}
-          <div className="w-[250px] flex-shrink-0 border-r border-slate-200 bg-slate-50 sticky left-0 z-20">
-            <div className="h-16 flex items-center px-4 border-b border-slate-200 sticky top-0 bg-slate-50 z-10">
-              <h3 className="font-bold text-slate-700">任務名稱</h3>
-            </div>
-            <div className="divide-y divide-slate-200">
-              {filteredTasks.map((task) => (
-                <div key={task.id} className="h-10 flex items-center px-4 text-sm text-slate-600" style={{ height: ROW_HEIGHT }}>
-                  <span className="truncate">{task.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
+        <div style={{ width: timelineWidth }}>
           {/* Chart */}
           <div className="relative" ref={chartContainerRef} onDrop={handleDrop} onDragOver={handleDragOver}>
             {/* Timeline Header */}
@@ -209,18 +193,18 @@ const GanttChartView: React.FC<{
             </div>
             
             {/* Grid and Tasks */}
-            <div className="relative" style={{ height: filteredTasks.length * ROW_HEIGHT }}>
+            <div className="relative" style={{ height: sortedTasks.length * ROW_HEIGHT }}>
               {/* Vertical Grid lines */}
               {[...Array(totalDays)].map((_, i) => (
                 <div key={i} className="absolute top-0 bottom-0 border-r border-slate-200" style={{ left: i * DAY_WIDTH, width: DAY_WIDTH }}></div>
               ))}
               {/* Horizontal Grid lines */}
-              {filteredTasks.map((_, index) => (
+              {sortedTasks.map((_, index) => (
                 <div key={index} className="absolute left-0 right-0 border-b border-slate-200" style={{ top: (index + 1) * ROW_HEIGHT }}></div>
               ))}
 
               {/* Task Bars */}
-              {filteredTasks.map(task => {
+              {sortedTasks.map(task => {
                 const visualIndex = visualIndexMap.get(task.id);
                 if (visualIndex === undefined) return null;
 
