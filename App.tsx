@@ -121,12 +121,9 @@ const App: React.FC = () => {
             if (Array.isArray(parsedData) && parsedData.length > 0) {
                 const revivedProjects = parsedData.map(reviveDates);
                 setProjects(revivedProjects);
-                if (revivedProjects.length > 0) {
-                  setCurrentProjectId(prevId => revivedProjects.some(p => p.id === prevId) ? prevId : revivedProjects[0].id);
-                }
+                // We no longer set a default project, so the user starts at the project list.
             } else {
                setProjects([]);
-               setCurrentProjectId(null);
             }
         } else {
             // No projects in storage for this key, create a sample one
@@ -153,7 +150,7 @@ const App: React.FC = () => {
                 lastModifiedBy: '系統'
             };
             setProjects([sampleProject]);
-            setCurrentProjectId(sampleProject.id);
+            // We no longer automatically open the sample project.
         }
     } catch (error) {
         console.error("無法從 localStorage 載入專案:", error);
