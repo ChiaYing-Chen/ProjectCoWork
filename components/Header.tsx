@@ -1,4 +1,5 @@
-import React, { useRef } from 'react';
+
+import React, { useRef, useState, useEffect } from 'react';
 import { ViewMode, Project } from '../types';
 import { format } from 'date-fns';
 
@@ -38,12 +39,6 @@ const PrintIcon: React.FC = () => (
   </svg>
 );
 
-const PdfIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V9a2 2 0 012-2h5l5 5v7a2 2 0 01-2 2z" />
-    </svg>
-);
-
 const GanttIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M3 6h18"/></svg>
 );
@@ -75,8 +70,28 @@ const ClockIcon: React.FC = () => (
     </svg>
 );
 
+const MoreIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
+    </svg>
+);
+
 const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetViewMode, onBackToProjects, onAddTask, onOpenSettings, onOpenExecutingUnits, onPrint }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -134,9 +149,10 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
             )}
           </div>
           {project && (
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="flex items-center space-x-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".mpp" />
-                <button onClick={handleImportClick} title="匯入 MPP 檔案" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
+                
+                <button onClick={handleImportClick} title="匯入 MPP 檔案" className="hidden md:flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
                     <FileImportIcon />
                     <span className="hidden sm:inline sm:ml-2">匯入</span>
                 </button>
@@ -144,11 +160,7 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
                     <AddIcon />
                     <span className="hidden sm:inline sm:ml-2">新增任務</span>
                 </button>
-                <button onClick={onPrint} title="儲存為 PDF" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
-                    <PdfIcon />
-                    <span className="hidden sm:inline sm:ml-2">儲存為 PDF</span>
-                </button>
-                <button onClick={onPrint} title="列印" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
+                <button onClick={onPrint} title="列印" className="hidden md:flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
                     <PrintIcon />
                     <span className="hidden sm:inline sm:ml-2">列印</span>
                 </button>
@@ -164,6 +176,30 @@ const Header: React.FC<HeaderProps> = ({ project, onFileImport, viewMode, onSetV
                         <GroupIcon /><span className="hidden sm:inline sm:ml-2">編輯關聯</span>
                     </button>
                 </div>
+                
+                {/* Mobile More Menu */}
+                <div ref={menuRef} className="relative md:hidden">
+                    <button onClick={() => setIsMenuOpen(prev => !prev)} className="p-2 text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
+                        <MoreIcon />
+                    </button>
+                    {isMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-slate-200">
+                            <ul className="py-1">
+                                <li>
+                                    <button onClick={() => { handleImportClick(); setIsMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                        <FileImportIcon /> <span className="ml-3">匯入 MPP</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => { onPrint(); setIsMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                                        <PrintIcon /> <span className="ml-3">列印</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    )}
+                </div>
+
             </div>
           )}
         </div>
