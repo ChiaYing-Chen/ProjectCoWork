@@ -1,19 +1,18 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { ViewMode, Project } from '../types';
 import { format } from 'date-fns';
 
 interface HeaderProps {
   project: Project | null | undefined;
-  onFileImport: (file: File) => void;
   viewMode: ViewMode;
   onSetViewMode: (mode: ViewMode) => void;
   onBackToProjects: () => void;
-  onAddTask: () => void;
   onOpenSettings?: () => void;
   onPrint: () => void;
   onCreateProject?: () => void;
   onImportProject?: (file: File) => void;
+  onImportData: (file: File, format: 'mpp' | 'ics') => void;
+  onExportData: (format: 'mpp' | 'ics') => void;
 }
 
 const BackIcon: React.FC = () => (
@@ -22,23 +21,18 @@ const BackIcon: React.FC = () => (
     </svg>
 );
 
-const MppImportIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const ImportIcon: React.FC<{className?: string}> = ({className}) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
   </svg>
 );
 
-const ImportIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-  </svg>
-);
-
-const AddIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+const ExportIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
 );
+
 
 const AddProjectIcon: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -46,8 +40,8 @@ const AddProjectIcon: React.FC = () => (
   </svg>
 );
 
-const PrintIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const PrintIcon: React.FC<{className?: string}> = ({className}) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H7a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm-3-14H8a2 2 0 00-2 2v2h12V5a2 2 0 00-2-2z" />
   </svg>
 );
@@ -64,69 +58,77 @@ const GroupIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" /></svg>
 );
 
-const SettingsIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-);
-
 const ClockIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
 );
 
+const DropdownArrowIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-0 sm:ml-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+);
+
 const Header: React.FC<HeaderProps> = ({ 
     project, 
-    onFileImport, 
     viewMode, 
     onSetViewMode, 
     onBackToProjects, 
-    onAddTask, 
     onOpenSettings, 
     onPrint,
     onCreateProject,
-    onImportProject
+    onImportProject,
+    onImportData,
+    onExportData,
 }) => {
   const mppFileInputRef = useRef<HTMLInputElement>(null);
+  const icsFileInputRef = useRef<HTMLInputElement>(null);
   const projectFileInputRef = useRef<HTMLInputElement>(null);
+
   const [isViewModeMenuOpen, setIsViewModeMenuOpen] = useState(false);
+  const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
+
   const viewModeMenuRef = useRef<HTMLDivElement>(null);
+  const fileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (viewModeMenuRef.current && !viewModeMenuRef.current.contains(event.target as Node)) {
-        setIsViewModeMenuOpen(false);
-      }
+      if (viewModeMenuRef.current && !viewModeMenuRef.current.contains(event.target as Node)) setIsViewModeMenuOpen(false);
+      if (fileMenuRef.current && !fileMenuRef.current.contains(event.target as Node)) setIsFileMenuOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleMppFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      onFileImport(file);
-    }
-     if (mppFileInputRef.current) {
-        mppFileInputRef.current.value = '';
-    }
+    if (file) onImportData(file, 'mpp');
+    if (mppFileInputRef.current) mppFileInputRef.current.value = '';
   };
-  const handleMppImportClick = () => mppFileInputRef.current?.click();
+
+  const handleIcsFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) onImportData(file, 'ics');
+    if (icsFileInputRef.current) icsFileInputRef.current.value = '';
+  };
   
   const handleProjectFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && onImportProject) {
-      onImportProject(file);
-    }
-     if (projectFileInputRef.current) {
-        projectFileInputRef.current.value = '';
-    }
+    if (file && onImportProject) onImportProject(file);
+    if (projectFileInputRef.current) projectFileInputRef.current.value = '';
   };
-  const handleProjectImportClick = () => projectFileInputRef.current?.click();
+  
+  const handleImportClick = (format: 'mpp' | 'ics') => {
+    if (format === 'mpp') mppFileInputRef.current?.click();
+    else icsFileInputRef.current?.click();
+    setIsFileMenuOpen(false);
+  };
+  
+  const handleProjectImportClick = () => {
+    projectFileInputRef.current?.click();
+    setIsFileMenuOpen(false);
+  };
 
   const viewModeOptions = {
     [ViewMode.Gantt]: { label: '甘特圖', icon: <GanttIcon /> },
@@ -162,88 +164,97 @@ const Header: React.FC<HeaderProps> = ({
                 )}
                </>
             ) : (
-                <div className="flex items-center space-x-2">
-                    <input type="file" ref={projectFileInputRef} onChange={handleProjectFileChange} className="hidden" accept=".json" />
-                    {onCreateProject &&
-                        <button
-                            onClick={onCreateProject}
-                            className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
-                        >
-                            <AddProjectIcon />
-                            建立新專案
-                        </button>
-                    }
-                    <button
-                        onClick={handleProjectImportClick}
-                        className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition duration-300"
-                    >
-                        <ImportIcon />
-                        匯入專案
-                    </button>
-                </div>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-800">專案列表</h1>
             )}
           </div>
           <div className="flex items-center space-x-2">
-            {project && (
-                <>
-                    <input type="file" ref={mppFileInputRef} onChange={handleMppFileChange} className="hidden" accept=".mpp" />
-                    
-                    <button onClick={handleMppImportClick} title="匯入 MPP 檔案" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
-                        <MppImportIcon />
-                        <span className="hidden sm:inline sm:ml-2">匯入</span>
-                    </button>
-                    <button onClick={onAddTask} title="新增任務" className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
-                        <AddIcon />
-                        <span className="hidden sm:inline sm:ml-2">新增任務</span>
-                    </button>
-                    <button onClick={onPrint} title="列印" className="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2 sm:py-2 sm:px-4 rounded-lg transition duration-300">
-                        <PrintIcon />
-                        <span className="hidden sm:inline sm:ml-2">列印</span>
-                    </button>
+            <input type="file" ref={mppFileInputRef} onChange={handleMppFileChange} className="hidden" accept=".mpp" />
+            <input type="file" ref={icsFileInputRef} onChange={handleIcsFileChange} className="hidden" accept=".ics,text/calendar" />
+            <input type="file" ref={projectFileInputRef} onChange={handleProjectFileChange} className="hidden" accept=".json" />
 
-                    <div className="relative" ref={viewModeMenuRef}>
-                        <button
-                            onClick={() => setIsViewModeMenuOpen(prev => !prev)}
-                            className="flex items-center bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-sm min-w-[50px] sm:min-w-[120px] justify-center sm:justify-between"
-                            aria-haspopup="true"
-                            aria-expanded={isViewModeMenuOpen}
-                        >
-                            <div className="flex items-center">
-                                {currentView.icon}
-                                <span className="ml-2 hidden sm:inline">{currentView.label}</span>
-                            </div>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-0 sm:ml-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {isViewModeMenuOpen && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-slate-200">
-                                <ul className="py-1" role="menu">
-                                    {(Object.keys(viewModeOptions) as ViewMode[]).map((mode) => (
-                                        <li key={mode}>
-                                            <button
-                                                onClick={() => {
-                                                    onSetViewMode(mode);
-                                                    setIsViewModeMenuOpen(false);
-                                                }}
-                                                className={`w-full text-left flex items-center px-4 py-2 text-sm ${viewMode === mode ? 'font-bold text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-slate-100'}`}
-                                                role="menuitem"
-                                            >
-                                                {viewModeOptions[mode].icon}
-                                                <span className="ml-3">{viewModeOptions[mode].label}</span>
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
+            {/* File Menu Dropdown */}
+            <div className="relative" ref={fileMenuRef}>
+                <button
+                    onClick={() => setIsFileMenuOpen(p => !p)}
+                    className="flex items-center bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-sm min-w-[50px] sm:min-w-[120px] justify-center sm:justify-between"
+                    aria-haspopup="true"
+                    aria-expanded={isFileMenuOpen}
+                >
+                    <div className="flex items-center">
+                        <span className="hidden sm:inline">📃檔案</span>
+                        <span className="sm:hidden text-lg">📃</span>
                     </div>
-                </>
+                    <DropdownArrowIcon />
+                </button>
+                {isFileMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-50 border border-slate-200">
+                        <ul className="py-1">
+                          {project ? (
+                            <>
+                              <li className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase">匯入</li>
+                              <li><button onClick={() => handleImportClick('mpp')} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><ImportIcon className="mr-3"/>從 MPP 檔案 (.mpp)</button></li>
+                              <li><button onClick={() => handleImportClick('ics')} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><ImportIcon className="mr-3"/>從 iCalendar 檔案 (.ics)</button></li>
+                              <li className="px-4 pt-2 pb-1 text-xs font-semibold text-slate-500 uppercase">匯出</li>
+                              <li><button onClick={() => { onExportData('mpp'); setIsFileMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><ExportIcon className="mr-3"/>匯出為 MPP 檔案 (.mpp)</button></li>
+                              <li><button onClick={() => { onExportData('ics'); setIsFileMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><ExportIcon className="mr-3"/>匯出為 iCalendar (.ics)</button></li>
+                              <div className="my-1 border-t border-slate-100"></div>
+                              <li><button onClick={() => { onPrint(); setIsFileMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><PrintIcon className="mr-3"/>列印</button></li>
+                            </>
+                          ) : (
+                            <>
+                              {onCreateProject && 
+                                <li><button onClick={() => { onCreateProject(); setIsFileMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><AddProjectIcon />建立新專案</button></li>
+                              }
+                              <li><button onClick={handleProjectImportClick} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><ImportIcon className="mr-2"/>匯入專案 (.json)</button></li>
+                            </>
+                          )}
+                        </ul>
+                    </div>
+                )}
+            </div>
+
+            {project && (
+                <div className="relative" ref={viewModeMenuRef}>
+                    <button
+                        onClick={() => setIsViewModeMenuOpen(prev => !prev)}
+                        className="flex items-center bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-sm min-w-[50px] sm:min-w-[120px] justify-center sm:justify-between"
+                        aria-haspopup="true"
+                        aria-expanded={isViewModeMenuOpen}
+                    >
+                        <div className="flex items-center">
+                            {currentView.icon}
+                            <span className="ml-2 hidden sm:inline">{currentView.label}</span>
+                        </div>
+                        <DropdownArrowIcon />
+                    </button>
+                    {isViewModeMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-slate-200">
+                            <ul className="py-1" role="menu">
+                                {(Object.keys(viewModeOptions) as ViewMode[]).map((mode) => (
+                                    <li key={mode}>
+                                        <button
+                                            onClick={() => {
+                                                onSetViewMode(mode);
+                                                setIsViewModeMenuOpen(false);
+                                            }}
+                                            className={`w-full text-left flex items-center px-4 py-2 text-sm ${viewMode === mode ? 'font-bold text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-slate-100'}`}
+                                            role="menuitem"
+                                        >
+                                            {viewModeOptions[mode].icon}
+                                            <span className="ml-3">{viewModeOptions[mode].label}</span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
             )}
             <div className="flex items-center space-x-2 pl-2 border-l border-slate-200 ml-2">
                 {onOpenSettings && (
-                    <button onClick={onOpenSettings} className="text-slate-500 hover:text-blue-600 transition duration-300 p-2" title="設定">
-                        <SettingsIcon />
+                    <button onClick={onOpenSettings} className="flex items-center text-slate-700 hover:bg-slate-100 font-semibold p-2 sm:py-2 sm:px-3 rounded-lg transition-colors duration-200" title="設定">
+                        <span className="sm:hidden">⚙️</span>
+                        <span className="hidden sm:inline">⚙️設定</span>
                     </button>
                 )}
             </div>

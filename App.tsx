@@ -1,8 +1,11 @@
 
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Task, ViewMode, Warning, TaskGroup, Project, ExecutingUnit } from './types';
 import { parseMppFile } from './services/mppParser';
+import { parseIcsFile } from './services/icsParser';
+import { exportProjectToIcs } from './services/icsExporter';
+import { exportProjectToMpp } from './services/mppExporter';
 import Header from './components/Header';
 import GanttChartView from './components/GanttChartView';
 import CalendarView from './components/CalendarView';
@@ -71,6 +74,12 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   
+  // Create a ref to hold the current project ID to avoid stale closures in callbacks.
+  const currentProjectIdRef = useRef(currentProjectId);
+  useEffect(() => {
+    currentProjectIdRef.current = currentProjectId;
+  }, [currentProjectId]);
+
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Calendar);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -225,72 +234,106 @@ const App: React.FC = () => {
     }
     setWarnings(newWarnings);
   }, []);
-
-  const updateCurrentProject = (updater: (project: Project) => Partial<Project>) => {
-    const now = new Date();
-    setProjects(prevProjects =>
-      prevProjects.map(p =>
-        p.id === currentProjectId ? { 
-            ...p, 
-            ...updater(p),
-            lastModified: now,
-            lastModifiedBy: modifierName 
-        } : p
-      )
-    );
-  };
   
-  const handleFileImport = async (file: File) => {
-    if (!currentProject) return;
+  const handleImportData = useCallback(async (file: File, format: 'mpp' | 'ics') => {
+    if (!currentProjectIdRef.current) return;
     setIsLoading(true);
     try {
-      const parsedTasks = await parseMppFile(file);
-      updateCurrentProject(proj => ({ ...proj, tasks: parsedTasks, name: proj.name || file.name }));
-      checkForWarnings(parsedTasks);
+      let parsedTasks: Task[];
+      if (format === 'mpp') {
+        parsedTasks = await parseMppFile(file);
+      } else {
+        parsedTasks = await parseIcsFile(file);
+      }
+      
+      setProjects(prev => prev.map(p => {
+          if (p.id !== currentProjectIdRef.current) return p;
+          checkForWarnings(parsedTasks);
+          return {
+              ...p,
+              tasks: parsedTasks,
+              name: format === 'mpp' ? p.name || file.name : p.name,
+              lastModified: new Date(),
+              lastModifiedBy: modifierName,
+          };
+      }));
+      showNotification(`${format.toUpperCase()} 檔案匯入成功！`, 'success');
     } catch (error) {
       console.error("檔案解析失敗:", error);
-      showNotification("無法解析此檔案。請確認格式是否正確。", "error");
+      showNotification(`無法解析 ${format.toUpperCase()} 檔案。請確認格式是否正確。`, "error");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [modifierName, showNotification, checkForWarnings]);
 
-  const handleDragTask = useCallback((taskId: number, newStartDate: Date) => {
-    if (!currentProject) return;
-    const { tasks, taskGroups } = currentProject;
-
-    const taskToMove = tasks.find(t => t.id === taskId);
-    if (!taskToMove) return;
-
-    const deltaDays = differenceInDays(newStartDate, taskToMove.start);
-    if (deltaDays === 0) return;
-
-    let updatedTasks = [...tasks];
-    if (taskToMove.groupId) {
-        const group = taskGroups.find(g => g.id === taskToMove.groupId);
-        if (group) {
-            const groupTaskIds = new Set(group.taskIds);
-            updatedTasks = updatedTasks.map(task => {
-                if (groupTaskIds.has(task.id)) {
-                    const duration = differenceInBusinessDays(task.end, task.start);
-                    const newStart = addDays(task.start, deltaDays);
-                    const newEnd = addDays(newStart, duration);
-                    return { ...task, start: newStart, end: newEnd };
-                }
-                return task;
-            });
-        }
-    } else {
-        const duration = differenceInBusinessDays(taskToMove.end, taskToMove.start);
-        const newEndDate = addDays(newStartDate, duration);
-        updatedTasks = tasks.map(task =>
-            task.id === taskId ? { ...task, start: newStartDate, end: newEndDate } : task
-        );
+  const handleExportData = async (format: 'mpp' | 'ics') => {
+    const project = projects.find(p => p.id === currentProjectIdRef.current);
+    if (!project) {
+        showNotification('請先選擇一個專案來匯出。', 'info');
+        return;
     }
     
-    checkForWarnings(updatedTasks);
-    updateCurrentProject(() => ({ tasks: updatedTasks }));
-  }, [currentProject, checkForWarnings]);
+    if (format === 'ics') {
+        const icsContent = exportProjectToIcs(project);
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8,' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${project.name}.ics`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showNotification('已成功匯出為 ICS 檔案。', 'success');
+    } else if (format === 'mpp') {
+        await exportProjectToMpp(project);
+        showNotification('MPP 匯出功能目前為模擬狀態。', 'info');
+    }
+  };
+
+  const handleDragTask = (taskId: number, newStartDate: Date) => {
+    setProjects(prevProjects => prevProjects.map(p => {
+        if (p.id !== currentProjectIdRef.current) return p;
+
+        const { tasks, taskGroups } = p;
+        const taskToMove = tasks.find(t => t.id === taskId);
+        if (!taskToMove) return p;
+
+        const deltaDays = differenceInDays(newStartDate, taskToMove.start);
+        if (deltaDays === 0) return p;
+
+        let updatedTasks = [...tasks];
+        if (taskToMove.groupId) {
+            const group = taskGroups.find(g => g.id === taskToMove.groupId);
+            if (group) {
+                const groupTaskIds = new Set(group.taskIds);
+                updatedTasks = updatedTasks.map(task => {
+                    if (groupTaskIds.has(task.id)) {
+                        const duration = differenceInBusinessDays(task.end, task.start);
+                        const newStart = addDays(task.start, deltaDays);
+                        const newEnd = addDays(newStart, duration);
+                        return { ...task, start: newStart, end: newEnd };
+                    }
+                    return task;
+                });
+            }
+        } else {
+            const duration = differenceInBusinessDays(taskToMove.end, taskToMove.start);
+            const newEndDate = addDays(newStartDate, duration);
+            updatedTasks = tasks.map(task =>
+                task.id === taskId ? { ...task, start: newStartDate, end: newEndDate } : task
+            );
+        }
+        
+        checkForWarnings(updatedTasks);
+        return {
+            ...p,
+            tasks: updatedTasks,
+            lastModified: new Date(),
+            lastModifiedBy: modifierName,
+        };
+    }));
+  };
 
   const handleSelectTask = useCallback((taskId: number, isCtrlOrMetaKey: boolean) => {
     if (isCtrlOrMetaKey) {
@@ -306,37 +349,45 @@ const App: React.FC = () => {
       setSelectedTaskIds(taskIds);
   }, []);
 
-  const handleCreateGroup = useCallback(() => {
-    if (!currentProject || selectedTaskIds.length < 2) return;
-    const { tasks, taskGroups } = currentProject;
+  const handleCreateGroup = () => {
+    if (selectedTaskIds.length < 2) return;
 
-    const isDuplicate = selectedTaskIds.some(id => {
-        const task = tasks.find(t => t.id === id);
-        return task && task.groupId;
-    });
+    setProjects(prevProjects => prevProjects.map(p => {
+        if (p.id !== currentProjectIdRef.current) return p;
 
-    if (isDuplicate) {
-        showNotification('選取的任務中，有任務已被關聯，無法重複關聯。', 'error');
-        return;
-    }
+        const { tasks, taskGroups } = p;
+        const isDuplicate = selectedTaskIds.some(id => {
+            const task = tasks.find(t => t.id === id);
+            return task && task.groupId;
+        });
 
-    const newGroupId = `group-${Date.now()}`;
-    const colors = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#4ade80', '#34d399', '#22d3ee', '#60a5fa', '#818cf8', '#c084fc'];
-    const randomColor = colors[taskGroups.length % colors.length];
+        if (isDuplicate) {
+            showNotification('選取的任務中，有任務已被關聯，無法重複關聯。', 'error');
+            return p;
+        }
 
-    const newGroup: TaskGroup = { id: newGroupId, taskIds: selectedTaskIds, color: randomColor };
-    const newGroups = [...taskGroups, newGroup];
-    const newTasks = tasks.map(task => 
-        selectedTaskIds.includes(task.id) ? { ...task, groupId: newGroupId } : task
-    );
+        const newGroupId = `group-${Date.now()}`;
+        const colors = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#4ade80', '#34d399', '#22d3ee', '#60a5fa', '#818cf8', '#c084fc'];
+        const randomColor = colors[taskGroups.length % colors.length];
 
-    updateCurrentProject(() => ({ tasks: newTasks, taskGroups: newGroups }));
-    setSelectedTaskIds([]);
-  }, [currentProject, selectedTaskIds, showNotification]);
+        const newGroup: TaskGroup = { id: newGroupId, taskIds: selectedTaskIds, color: randomColor };
+        const newGroups = [...taskGroups, newGroup];
+        const newTasks = tasks.map(task => 
+            selectedTaskIds.includes(task.id) ? { ...task, groupId: newGroupId } : task
+        );
 
-  const handleSaveTask = useCallback((taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; predecessorId?: number; notes?: string; }) => {
-    if (!currentProject) return;
-    
+        setSelectedTaskIds([]);
+        return {
+            ...p,
+            tasks: newTasks,
+            taskGroups: newGroups,
+            lastModified: new Date(),
+            lastModifiedBy: modifierName,
+        };
+    }));
+  };
+  
+  const handleSaveTask = (taskData: { id?: number; name: string; start: Date; end: Date; executingUnit?: string; predecessorId?: number; notes?: string; }) => {
     // Add new executing unit to the list if it doesn't exist
     if (taskData.executingUnit && !executingUnits.some(u => u.name === taskData.executingUnit)) {
         const newUnit: ExecutingUnit = {
@@ -348,8 +399,10 @@ const App: React.FC = () => {
         localStorage.setItem('project-scheduler-units', JSON.stringify(newUnits));
     }
 
-    updateCurrentProject(proj => {
-        const { tasks } = proj;
+    setProjects(prevProjects => prevProjects.map(p => {
+        if (p.id !== currentProjectIdRef.current) return p;
+
+        const { tasks } = p;
         let newTasks;
         if (taskData.id) { // Update
             newTasks = tasks.map(task =>
@@ -372,17 +425,23 @@ const App: React.FC = () => {
             newTasks = [...tasks, newTask];
         }
         checkForWarnings(newTasks);
-        return { tasks: newTasks };
-    });
+        return {
+            ...p,
+            tasks: newTasks,
+            lastModified: new Date(),
+            lastModifiedBy: modifierName,
+        };
+    }));
     setIsTaskFormOpen(false);
-  }, [currentProject, checkForWarnings, executingUnits]);
+  };
 
-  const handleUngroupTask = useCallback((taskIdToUngroup: number) => {
-    if (!currentProject) return;
-    updateCurrentProject(proj => {
-        const { tasks, taskGroups } = proj;
+  const handleUngroupTask = (taskIdToUngroup: number) => {
+    setProjects(prevProjects => prevProjects.map(p => {
+        if (p.id !== currentProjectIdRef.current) return p;
+
+        const { tasks, taskGroups } = p;
         const taskToUngroup = tasks.find(t => t.id === taskIdToUngroup);
-        if (!taskToUngroup || !taskToUngroup.groupId) return {};
+        if (!taskToUngroup || !taskToUngroup.groupId) return p;
 
         const groupId = taskToUngroup.groupId;
         const updatedGroups = taskGroups.map(group => 
@@ -403,12 +462,17 @@ const App: React.FC = () => {
         });
 
         setSelectedTaskIds(prev => prev.filter(id => id !== taskIdToUngroup));
-        return { tasks: finalTasks, taskGroups: finalGroups };
-    });
-  }, [currentProject]);
+        return {
+            ...p,
+            tasks: finalTasks,
+            taskGroups: finalGroups,
+            lastModified: new Date(),
+            lastModifiedBy: modifierName,
+        };
+    }));
+  };
 
-  const handleDeleteTasks = useCallback((taskIdsToDelete: number[]) => {
-    if (!currentProject) return;
+  const handleDeleteTasks = (taskIdsToDelete: number[]) => {
     if (taskIdsToDelete.length === 0) return;
 
     const taskNoun = taskIdsToDelete.length > 1 ? `這 ${taskIdsToDelete.length} 項任務` : '此任務';
@@ -416,12 +480,23 @@ const App: React.FC = () => {
         return;
     }
 
-    updateCurrentProject(proj => {
+    setProjects(prevProjects => prevProjects.map(p => {
+        if (p.id !== currentProjectIdRef.current) return p;
+
         const idsToDeleteSet = new Set(taskIdsToDelete);
         
-        const newTasks = proj.tasks.filter(t => !idsToDeleteSet.has(t.id));
+        // Filter tasks and clean up predecessor links in one pass
+        const remainingTasks = p.tasks
+            .filter(t => !idsToDeleteSet.has(t.id))
+            .map(t => {
+                if (t.predecessorId && idsToDeleteSet.has(t.predecessorId)) {
+                    return { ...t, predecessorId: undefined };
+                }
+                return t;
+            });
         
-        const updatedGroupsResult = proj.taskGroups.map(group => {
+        // Update groups, dissolving any that become too small
+        const updatedGroupsResult = p.taskGroups.map(group => {
             const newTaskIds = group.taskIds.filter(id => !idsToDeleteSet.has(id));
             return { ...group, taskIds: newTaskIds };
         }).reduce((acc, group) => {
@@ -435,44 +510,103 @@ const App: React.FC = () => {
 
         const { finalGroups, dissolvedGroupIds } = updatedGroupsResult;
 
-        const finalTasks = newTasks.map(task => {
+        // Clean up groupId for tasks in dissolved groups
+        const finalTasks = remainingTasks.map(task => {
             if (task.groupId && dissolvedGroupIds.has(task.groupId)) {
                 return { ...task, groupId: undefined };
             }
             return task;
         });
         
-        return { tasks: finalTasks, taskGroups: finalGroups };
-    });
+        return {
+            ...p,
+            tasks: finalTasks,
+            taskGroups: finalGroups,
+            lastModified: new Date(),
+            lastModifiedBy: modifierName,
+        };
+    }));
 
     setSelectedTaskIds([]);
     showNotification(`已成功刪除 ${taskIdsToDelete.length} 項任務`, 'success');
-  }, [currentProject, showNotification]);
+  };
 
+  const handleExportSelectedTasks = (taskIdsToExport: number[]) => {
+    const project = projects.find(p => p.id === currentProjectIdRef.current);
+    if (!project || taskIdsToExport.length === 0) {
+        showNotification('沒有選取任何任務可匯出。', 'info');
+        return;
+    }
+    
+    const selectedTasks = project.tasks.filter(t => taskIdsToExport.includes(t.id));
 
-  const openTaskFormForCreate = () => { setTaskToEdit(null); setIsTaskFormOpen(true); };
+    if (selectedTasks.length === 0) {
+        showNotification('找不到選取的任務。', 'info');
+        return;
+    }
+
+    const tempProject: Project = {
+        ...project,
+        tasks: selectedTasks,
+        name: `${project.name} (選取項目)`
+    };
+
+    const icsContent = exportProjectToIcs(tempProject);
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8,' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${tempProject.name}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showNotification(`已成功匯出 ${selectedTasks.length} 項任務為 ICS 檔案。`, 'success');
+  };
+
+  const openTaskFormForCreate = (date?: Date) => {
+    if (date) {
+      const transientTask = {
+        start: date,
+        end: date,
+        name: '',
+        progress: 0,
+      } as Task;
+      setTaskToEdit(transientTask);
+    } else {
+      setTaskToEdit(null);
+    }
+    setIsTaskFormOpen(true);
+  };
   const openTaskFormForEdit = (task: Task) => { setTaskToEdit(task); setIsTaskFormOpen(true); };
   
-  const handleUpdateGroup = useCallback((groupId: string, updates: Partial<Pick<TaskGroup, 'name' | 'taskIds'>>) => {
-      updateCurrentProject(proj => ({
-          taskGroups: proj.taskGroups.map(g => g.id === groupId ? { ...g, ...updates } : g)
+  const handleUpdateGroup = (groupId: string, updates: Partial<Pick<TaskGroup, 'name' | 'taskIds'>>) => {
+      setProjects(prev => prev.map(p => {
+          if (p.id !== currentProjectIdRef.current) return p;
+          return {
+              ...p,
+              taskGroups: p.taskGroups.map(g => g.id === groupId ? { ...g, ...updates } : g),
+              lastModified: new Date(),
+              lastModifiedBy: modifierName,
+          };
       }));
-  }, []);
+  };
 
-  const handleUpdateTaskInterval = useCallback((groupId: string, previousTaskId: number, taskToShiftId: number, newInterval: number) => {
-    if (!currentProject) return;
-    updateCurrentProject(proj => {
-        const { tasks, taskGroups } = proj;
+  const handleUpdateTaskInterval = (groupId: string, previousTaskId: number, taskToShiftId: number, newInterval: number) => {
+    setProjects(prev => prev.map(p => {
+        if (p.id !== currentProjectIdRef.current) return p;
+
+        const { tasks, taskGroups } = p;
         const previousTask = tasks.find(t => t.id === previousTaskId);
         const taskToShift = tasks.find(t => t.id === taskToShiftId);
-        if (!previousTask || !taskToShift) return {};
+        if (!previousTask || !taskToShift) return p;
 
         const newStartDate = addDays(previousTask.end, newInterval);
         const delta = differenceInDays(newStartDate, taskToShift.start);
-        if (delta === 0) return {};
+        if (delta === 0) return p;
 
         const group = taskGroups.find(g => g.id === groupId);
-        if (!group) return {};
+        if (!group) return p;
 
         const groupTasks = group.taskIds
             .map(id => tasks.find(t => t.id === id)!)
@@ -493,23 +627,26 @@ const App: React.FC = () => {
         });
         
         checkForWarnings(newTasks);
-        return { tasks: newTasks };
-    });
-  }, [currentProject, checkForWarnings]);
+        return {
+            ...p,
+            tasks: newTasks,
+            lastModified: new Date(),
+            lastModifiedBy: modifierName,
+        };
+    }));
+  };
 
-  const handleReorderGroupTasks = useCallback((groupId: string, newOrderedTaskIds: number[]) => {
-      handleUpdateGroup(groupId, { taskIds: newOrderedTaskIds });
+  const handleReorderGroupTasks = (groupId: string, newOrderedTaskIds: number[]) => {
+      setProjects(prev => prev.map(p => {
+          if (p.id !== currentProjectIdRef.current) return p;
 
-      updateCurrentProject(proj => {
-          const { tasks } = proj;
+          const { tasks } = p;
           const groupTasks = newOrderedTaskIds.map(id => tasks.find(t => t.id === id)!).filter(Boolean);
-
-          if (groupTasks.length < 2) return {};
+          if (groupTasks.length < 2) return p;
 
           const durationMap = new Map(groupTasks.map(t => [t.id, differenceInDays(t.end, t.start)]));
           const taskUpdates = new Map<number, {start: Date, end: Date}>();
 
-          // First task in new order keeps its position
           let lastEndDate = groupTasks[0].end;
 
           for (let i = 1; i < groupTasks.length; i++) {
@@ -529,9 +666,15 @@ const App: React.FC = () => {
           });
 
           checkForWarnings(newTasks);
-          return { tasks: newTasks };
-      });
-  }, [handleUpdateGroup, checkForWarnings]);
+          return {
+              ...p,
+              tasks: newTasks,
+              taskGroups: p.taskGroups.map(g => g.id === groupId ? { ...g, taskIds: newOrderedTaskIds } : g),
+              lastModified: new Date(),
+              lastModifiedBy: modifierName,
+          };
+      }));
+  };
 
   const handleSaveProject = (name: string, startDate: Date, endDate: Date) => {
     const newProject: Project = {
@@ -554,9 +697,7 @@ const App: React.FC = () => {
     if (!projectToDelete) return;
     if (window.confirm(`您確定要刪除專案「${projectToDelete.name}」嗎？此操作無法復原。`)) {
       setProjects(prev => prev.filter(p => p.id !== projectId));
-      if (currentProjectId === projectId) {
-        setCurrentProjectId(null);
-      }
+      setCurrentProjectId(prevId => (prevId === projectId ? null : prevId));
     }
   };
 
@@ -608,19 +749,28 @@ const App: React.FC = () => {
   }, [modifierName, showNotification]);
 
   const handleDeleteGroup = (groupId: string) => {
-    if (!currentProject) return;
-    const groupName = currentProject.taskGroups.find(g => g.id === groupId)?.name || '該關聯';
+    const project = projects.find(p => p.id === currentProjectId);
+    const groupName = project?.taskGroups.find(g => g.id === groupId)?.name || '該關聯';
+
     if (window.confirm(`您確定要刪除「${groupName}」嗎？\n此操作將解除群組內所有任務的關聯，但不會刪除任務本身。`)) {
-      updateCurrentProject(proj => {
-        const groupToDissolve = proj.taskGroups.find(g => g.id === groupId);
-        if (!groupToDissolve) return {};
-        
-        const taskIdsInGroup = new Set(groupToDissolve.taskIds);
-        const newTasks = proj.tasks.map(t => taskIdsInGroup.has(t.id) ? { ...t, groupId: undefined } : t);
-        const newGroups = proj.taskGroups.filter(g => g.id !== groupId);
-  
-        return { tasks: newTasks, taskGroups: newGroups };
-      });
+        setProjects(prev => prev.map(p => {
+            if (p.id !== currentProjectIdRef.current) return p;
+
+            const groupToDissolve = p.taskGroups.find(g => g.id === groupId);
+            if (!groupToDissolve) return p;
+            
+            const taskIdsInGroup = new Set(groupToDissolve.taskIds);
+            const newTasks = p.tasks.map(t => taskIdsInGroup.has(t.id) ? { ...t, groupId: undefined } : t);
+            const newGroups = p.taskGroups.filter(g => g.id !== groupId);
+      
+            return {
+                ...p,
+                tasks: newTasks,
+                taskGroups: newGroups,
+                lastModified: new Date(),
+                lastModifiedBy: modifierName,
+            };
+        }));
     }
   };
 
@@ -733,13 +883,13 @@ const App: React.FC = () => {
     <div className="bg-slate-50 min-h-screen font-sans">
       <Header
         project={currentProject}
-        onFileImport={handleFileImport}
+        onImportData={handleImportData}
+        onExportData={handleExportData}
         onImportProject={handleProjectImport}
         onCreateProject={() => setIsProjectFormOpen(true)}
         viewMode={viewMode}
         onSetViewMode={setViewMode}
         onBackToProjects={() => setCurrentProjectId(null)}
-        onAddTask={openTaskFormForCreate}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onPrint={handlePrint}
       />
@@ -784,6 +934,7 @@ const App: React.FC = () => {
                 onEditTask={openTaskFormForEdit}
                 executingUnits={executingUnits}
                 onDeleteSelectedTasks={handleDeleteTasks}
+                onExportSelectedTasks={handleExportSelectedTasks}
               />
             )}
             {viewMode === ViewMode.Group && (

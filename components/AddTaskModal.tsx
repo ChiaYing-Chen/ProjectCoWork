@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Task, ExecutingUnit } from '../types';
+import { format } from 'date-fns';
 
 interface TaskFormModalProps {
   isOpen: boolean;
@@ -24,10 +25,10 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
   const [error, setError] = useState('');
 
   const resetForm = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
     setName('');
-    setStartDate(today);
-    setEndDate(today);
+    setStartDate(format(today, 'yyyy-MM-dd'));
+    setEndDate(format(today, 'yyyy-MM-dd'));
     setExecutingUnit('');
     setPredecessorId('');
     setNotes('');
@@ -40,8 +41,8 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
     if (isOpen) {
       if (taskToEdit) {
         setName(taskToEdit.name);
-        setStartDate(taskToEdit.start.toISOString().split('T')[0]);
-        setEndDate(taskToEdit.end.toISOString().split('T')[0]);
+        setStartDate(format(taskToEdit.start, 'yyyy-MM-dd'));
+        setEndDate(format(taskToEdit.end, 'yyyy-MM-dd'));
         setPredecessorId(taskToEdit.predecessorId?.toString() || '');
         setNotes(taskToEdit.notes || '');
         const unitName = taskToEdit.executingUnit || '';
@@ -77,8 +78,8 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
       setError('任務名稱不可為空。');
       return;
     }
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = new Date(startDate + 'T00:00:00');
+    const end = new Date(endDate + 'T00:00:00');
     if (end < start) {
       setError('結束日期不可早於開始日期。');
       return;
@@ -113,8 +114,8 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
     return null;
   }
   
-  const title = taskToEdit ? '編輯任務' : '新增任務';
-  const buttonText = taskToEdit ? '儲存變更' : '儲存任務';
+  const title = taskToEdit && taskToEdit.id ? '編輯任務' : '新增任務';
+  const buttonText = taskToEdit && taskToEdit.id ? '儲存變更' : '儲存任務';
   const possiblePredecessors = tasks.filter(task => task.id !== taskToEdit?.id);
 
   return (
@@ -209,7 +210,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
         </div>
         <div className="mt-6 flex justify-between items-center">
           <div>
-            {taskToEdit && onDelete && (
+            {taskToEdit && taskToEdit.id && onDelete && (
                 <button
                 onClick={handleDelete}
                 className="px-4 py-2 bg-transparent text-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition flex items-center"

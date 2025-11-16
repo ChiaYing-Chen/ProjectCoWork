@@ -95,18 +95,19 @@ interface CalendarViewProps {
   onSelectTask: (taskId: number, isCtrlOrMetaKey: boolean) => void;
   onMultiSelectTasks: (taskIds: number[]) => void;
   onCreateGroup: () => void;
-  onOpenAddTaskModal: () => void;
+  onOpenAddTaskModal: (date?: Date) => void;
   onUngroupTask: (taskId: number) => void;
   taskGroups: TaskGroup[];
   onEditTask: (task: Task) => void;
   executingUnits: ExecutingUnit[];
   onDeleteSelectedTasks: (taskIds: number[]) => void;
+  onExportSelectedTasks: (taskIds: number[]) => void;
 }
 
 const MONTH_COLORS = ['#4f46e5', '#db2777', '#16a34a', '#d97706', '#6d28d9', '#0891b2', '#ca8a04', '#be185d'];
 
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, projectEndDate, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, projectEndDate, warnings, onDragTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, onExportSelectedTasks }) => {
   const [touchedTaskIds, setTouchedTaskIds] = useState<Set<number>>(new Set());
   const [dayViewDate, setDayViewDate] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -116,6 +117,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   
   const [deselectedUnits, setDeselectedUnits] = useState<Set<string>>(new Set());
   const [deselectedMonths, setDeselectedMonths] = useState<Set<string>>(new Set());
+  const [isFilterVisible, setIsFilterVisible] = useState(true);
 
   const allMonths = useMemo(() => {
     const months = [];
@@ -302,49 +304,71 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
 
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 relative view-container">
+    <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 flex flex-col view-container" style={{ height: 'calc(100vh - 120px)' }}>
       {(unitsInUse.length > 0 || allMonths.length > 0) && (
-        <div className="p-4 border-b border-t border-slate-200 bg-slate-50 mb-2 rounded-md flex-shrink-0 flex">
-            {/* Left Side: Months */}
-            {allMonths.length > 0 && (
-                <div className="w-1/4 pr-4 flex-shrink-0">
-                    <div className="flex flex-col space-y-2">
-                        {Array.from(monthColorMap.entries()).map(([monthKey, color]) => (
-                            <button key={monthKey} className="flex items-center cursor-pointer p-1 rounded-md hover:bg-slate-200 transition-colors text-left" onClick={() => handleToggleMonth(monthKey)}>
-                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner flex-shrink-0" style={{ backgroundColor: color }}></div>
-                                <span className={`text-sm text-slate-600 ${deselectedMonths.has(monthKey) ? 'line-through text-slate-400' : ''}`}>
-                                    {format(new Date(monthKey + '-01T00:00:00'), 'yyyy / M', { locale: zhTW })}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
+        <div className="bg-slate-50 rounded-md border border-slate-200 mb-2 flex-shrink-0">
+          <button
+            onClick={() => setIsFilterVisible(!isFilterVisible)}
+            className="w-full flex items-center justify-between p-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
+            aria-expanded={isFilterVisible}
+            aria-controls="filter-panel"
+          >
+            <div className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L16 11.414V16a1 1 0 01-.293.707l-2 2A1 1 0 0112 18v-1.586l-3.707-3.707A1 1 0 018 12V6.414L3.293 4.707A1 1 0 013 4z" />
+              </svg>
+              <span>圖例與篩選</span>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-slate-500 transform transition-transform duration-300 ${isFilterVisible ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div
+            id="filter-panel"
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${isFilterVisible ? 'max-h-[500px]' : 'max-h-0'}`}
+          >
+            <div className="p-4 border-t border-slate-200 flex-shrink-0 flex">
+              {/* Left Side: Months */}
+              {allMonths.length > 0 && (
+                  <div className="w-1/4 pr-4 flex-shrink-0">
+                      <div className="flex flex-col space-y-2">
+                          {Array.from(monthColorMap.entries()).map(([monthKey, color]) => (
+                              <button key={monthKey} className="flex items-center cursor-pointer p-1 rounded-md hover:bg-slate-200 transition-colors text-left" onClick={() => handleToggleMonth(monthKey)}>
+                                  <div className="w-4 h-4 rounded-sm mr-2 shadow-inner flex-shrink-0" style={{ backgroundColor: color }}></div>
+                                  <span className={`text-sm text-slate-600 ${deselectedMonths.has(monthKey) ? 'line-through text-slate-400' : ''}`}>
+                                      {format(new Date(monthKey + '-01T00:00:00'), 'yyyy / M', { locale: zhTW })}
+                                  </span>
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+              )}
 
-            {/* Divider */}
-            {allMonths.length > 0 && unitsInUse.length > 0 && (
-                <div className="border-l border-slate-200"></div>
-            )}
+              {/* Divider */}
+              {allMonths.length > 0 && unitsInUse.length > 0 && (
+                  <div className="border-l border-slate-200"></div>
+              )}
 
-            {/* Right Side: Units */}
-            {unitsInUse.length > 0 && (
-                <div className={`flex-1 ${allMonths.length > 0 ? 'pl-4' : ''}`}>
-                    <div className="flex flex-wrap gap-x-6 gap-y-2">
-                        {unitsInUse.map(unit => (
-                            <button key={unit.name} className="flex items-center cursor-pointer p-1 rounded-md hover:bg-slate-200 transition-colors" onClick={() => handleToggleUnit(unit.name)}>
-                                <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unit.color }}></div>
-                                <span className={`text-sm text-slate-600 ${deselectedUnits.has(unit.name) ? 'line-through text-slate-400' : ''}`}>{unit.name}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
+              {/* Right Side: Units */}
+              {unitsInUse.length > 0 && (
+                  <div className={`flex-1 ${allMonths.length > 0 ? 'pl-4' : ''}`}>
+                      <div className="flex flex-wrap gap-x-6 gap-y-2">
+                          {unitsInUse.map(unit => (
+                              <button key={unit.name} className="flex items-center cursor-pointer p-1 rounded-md hover:bg-slate-200 transition-colors" onClick={() => handleToggleUnit(unit.name)}>
+                                  <div className="w-4 h-4 rounded-sm mr-2 shadow-inner" style={{ backgroundColor: unit.color }}></div>
+                                  <span className={`text-sm text-slate-600 ${deselectedUnits.has(unit.name) ? 'line-through text-slate-400' : ''}`}>{unit.name}</span>
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       <div
-        className="overflow-y-auto calendar-print-container"
-        style={{ maxHeight: 'calc(100vh - 240px)' }}
+        className="overflow-y-auto calendar-print-container flex-grow"
         ref={scrollContainerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -357,6 +381,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
             {selectedTaskIds.length > 0 && (
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 z-10">
                   <div className="bg-white p-2 rounded-lg shadow-lg flex items-center space-x-2 border border-slate-200">
+                      <button
+                          onClick={() => onExportSelectedTasks(selectedTaskIds)}
+                          className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center"
+                          title="將選取的任務匯出為 .ics 檔案"
+                      >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          匯出
+                      </button>
                       <button
                           onClick={handleDeleteClick}
                           className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center"
@@ -457,6 +489,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         onEditTask={(task) => {
           setDayViewDate(null);
           onEditTask(task);
+        }}
+        onAddTaskForDate={(date) => {
+          setDayViewDate(null);
+          onOpenAddTaskModal(date);
         }}
       />
     </div>

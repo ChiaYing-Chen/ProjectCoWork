@@ -34,6 +34,7 @@ interface DayViewModalProps {
   taskGroups: TaskGroup[];
   executingUnits: ExecutingUnit[];
   onEditTask: (task: Task) => void;
+  onAddTaskForDate: (date: Date) => void;
 }
 
 const DayViewModal: React.FC<DayViewModalProps> = ({
@@ -43,6 +44,7 @@ const DayViewModal: React.FC<DayViewModalProps> = ({
   taskGroups,
   executingUnits,
   onEditTask,
+  onAddTaskForDate,
 }) => {
   if (!date) {
     return null;
@@ -57,16 +59,11 @@ const DayViewModal: React.FC<DayViewModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 transition-opacity" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl p-0 w-full max-w-md transform transition-all" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center p-4 border-b border-slate-200">
             <h2 className="text-lg font-bold text-slate-800">
                 {format(date, 'yyyy年 MMMM d日 (EEEE)', { locale: zhTW })}
             </h2>
-            <button onClick={onClose} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto">
           {dayTasks.length === 0 ? (
@@ -88,6 +85,23 @@ const DayViewModal: React.FC<DayViewModalProps> = ({
               })}
             </div>
           )}
+        </div>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end space-x-3">
+            <button
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition"
+            >
+                關閉
+            </button>
+            <button
+                onClick={() => onAddTaskForDate(date)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition flex items-center"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                新增任務
+            </button>
         </div>
       </div>
     </div>
