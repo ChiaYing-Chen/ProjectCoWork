@@ -123,6 +123,22 @@ const GanttChartView: React.FC<{
     };
   }, [tasks]);
 
+  const months = useMemo(() => {
+    const monthMap = new Map<string, { name: string; dayCount: number }>();
+    if (totalDays <= 0) return [];
+
+    for (let i = 0; i < totalDays; i++) {
+        const day = addDays(startDate, i);
+        const monthKey = format(day, 'yyyy-MM');
+        const monthName = format(day, 'M月', { locale: zhTW });
+        if (!monthMap.has(monthKey)) {
+            monthMap.set(monthKey, { name: monthName, dayCount: 0 });
+        }
+        monthMap.get(monthKey)!.dayCount++;
+    }
+    return Array.from(monthMap.values());
+  }, [startDate, totalDays]);
+
   React.useEffect(() => {
     setTimelineWidth(totalDays * DAY_WIDTH);
   }, [totalDays]);
@@ -156,9 +172,9 @@ const GanttChartView: React.FC<{
   const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u.name)), [executingUnits, tasks]);
 
   return (
-    <div className="bg-white rounded-lg shadow-lg flex flex-col view-container">
+    <div className="bg-white rounded-lg shadow-lg flex flex-col view-container" style={{ height: 'calc(100vh - 120px)' }}>
       {unitsInUse.length > 0 && (
-        <div className="p-4 border-b border-slate-200 bg-slate-50 rounded-t-lg flex">
+        <div className="p-4 border-b border-slate-200 bg-slate-50 rounded-t-lg flex flex-shrink-0">
             {/* Units */}
             <div className="flex-1">
                 <div className="flex flex-wrap gap-x-6 gap-y-2">
@@ -172,20 +188,36 @@ const GanttChartView: React.FC<{
             </div>
         </div>
       )}
-      <div className="overflow-x-auto gantt-print-container">
+      <div className="overflow-x-auto overflow-y-auto gantt-print-container flex-grow">
         <div style={{ width: timelineWidth }}>
           {/* Chart */}
           <div className="relative" ref={chartContainerRef} onDrop={handleDrop} onDragOver={handleDragOver}>
             {/* Timeline Header */}
             <div className="sticky top-0 bg-white z-10">
+              {/* Month Row */}
+              <div className="flex border-b border-slate-200" style={{ width: timelineWidth }}>
+                {months.map((month, index) => (
+                  <div 
+                    key={index} 
+                    className="flex items-center justify-center border-r border-slate-200 h-8"
+                    style={{ width: month.dayCount * DAY_WIDTH }}
+                  >
+                    <span className="text-sm font-bold text-slate-800">{month.name}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Day Row */}
               <div className="flex" style={{ width: timelineWidth }}>
                 {[...Array(totalDays)].map((_, i) => {
                   const day = addDays(startDate, i);
                   const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                   return (
-                    <div key={i} className={`flex-shrink-0 border-r border-b border-slate-200 text-center ${isWeekend ? 'bg-slate-50' : ''}`} style={{ width: DAY_WIDTH }}>
-                      <div className="text-xs text-slate-500">{format(day, 'EEE', { locale: zhTW })}</div>
-                      <div className="text-sm font-semibold text-slate-700">{format(day, 'd')}</div>
+                    <div 
+                      key={i} 
+                      className={`flex flex-shrink-0 items-center justify-center border-r border-b border-slate-200 h-8 ${isWeekend ? 'bg-pink-50' : ''}`} 
+                      style={{ width: DAY_WIDTH }}
+                    >
+                      <span className={`text-xs font-semibold ${isWeekend ? 'text-pink-600' : 'text-slate-700'}`}>{format(day, 'd')}</span>
                     </div>
                   );
                 })}
@@ -195,9 +227,17 @@ const GanttChartView: React.FC<{
             {/* Grid and Tasks */}
             <div className="relative" style={{ height: sortedTasks.length * ROW_HEIGHT }}>
               {/* Vertical Grid lines */}
-              {[...Array(totalDays)].map((_, i) => (
-                <div key={i} className="absolute top-0 bottom-0 border-r border-slate-200" style={{ left: i * DAY_WIDTH, width: DAY_WIDTH }}></div>
-              ))}
+              {[...Array(totalDays)].map((_, i) => {
+                const day = addDays(startDate, i);
+                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                return (
+                  <div
+                    key={i}
+                    className={`absolute top-0 bottom-0 border-r border-slate-200 ${isWeekend ? 'bg-pink-50' : ''}`}
+                    style={{ left: i * DAY_WIDTH, width: DAY_WIDTH }}
+                  ></div>
+                );
+              })}
               {/* Horizontal Grid lines */}
               {sortedTasks.map((_, index) => (
                 <div key={index} className="absolute left-0 right-0 border-b border-slate-200" style={{ top: (index + 1) * ROW_HEIGHT }}></div>

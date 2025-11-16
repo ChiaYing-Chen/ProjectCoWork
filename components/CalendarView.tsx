@@ -233,9 +233,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   }, [onMultiSelectTasks]);
 
   const handleDayClick = (e: React.MouseEvent<HTMLDivElement>, day: Date) => {
-    if (e.target === e.currentTarget) {
-        setDayViewDate(day);
+    const targetElement = e.target as HTMLElement;
+    // 如果點擊的目標是任務項目或其子元素 (例如解除群組按鈕)，則不觸發日視圖。
+    // 這樣可以確保點擊任務是選取，點擊空白處或日期數字是開啟日視圖。
+    if (targetElement.closest('[data-task-id]')) {
+      return;
     }
+    setDayViewDate(day);
   };
 
   const clearLongPressTimer = () => {
