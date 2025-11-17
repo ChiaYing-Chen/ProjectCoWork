@@ -206,7 +206,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   const today = useMemo(() => new Date(), []);
   
   const [deselectedUnits, setDeselectedUnits] = useState<Set<string>>(new Set());
-  const [isFilterVisible, setIsFilterVisible] = useState(true);
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [resizingInfo, setResizingInfo] = useState<ResizingInfo | null>(null);
   const [resizePreview, setResizePreview] = useState<{ start: Date; end: Date } | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<number | null>(null);

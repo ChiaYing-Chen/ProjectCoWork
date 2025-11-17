@@ -543,11 +543,6 @@ const App: React.FC = () => {
   const handleDeleteTasks = (taskIdsToDelete: number[]) => {
     if (taskIdsToDelete.length === 0) return;
 
-    const taskNoun = taskIdsToDelete.length > 1 ? `這 ${taskIdsToDelete.length} 項任務` : '此任務';
-    if (!window.confirm(`您確定要刪除${taskNoun}嗎？此操作無法復原。`)) {
-        return;
-    }
-
     updateProjectState((currentTasks, currentTaskGroups) => {
         const idsToDeleteSet = new Set(taskIdsToDelete);
         
@@ -796,21 +791,16 @@ const App: React.FC = () => {
   }, [modifierName, showNotification]);
 
   const handleDeleteGroup = (groupId: string) => {
-    const project = projects.find(p => p.id === currentProjectId);
-    const groupName = project?.taskGroups.find(g => g.id === groupId)?.name || '該關聯';
-
-    if (window.confirm(`您確定要刪除「${groupName}」嗎？\n此操作將解除群組內所有任務的關聯，但不會刪除任務本身。`)) {
-        updateProjectState((currentTasks, currentTaskGroups) => {
-            const groupToDissolve = currentTaskGroups.find(g => g.id === groupId);
-            if (!groupToDissolve) return { newTasks: currentTasks, newTaskGroups: currentTaskGroups };
-            
-            const taskIdsInGroup = new Set(groupToDissolve.taskIds);
-            const newTasks = currentTasks.map(t => taskIdsInGroup.has(t.id) ? { ...t, groupId: undefined } : t);
-            const newGroups = currentTaskGroups.filter(g => g.id !== groupId);
-      
-            return { newTasks, newTaskGroups: newGroups };
-        });
-    }
+    updateProjectState((currentTasks, currentTaskGroups) => {
+        const groupToDissolve = currentTaskGroups.find(g => g.id === groupId);
+        if (!groupToDissolve) return { newTasks: currentTasks, newTaskGroups: currentTaskGroups };
+        
+        const taskIdsInGroup = new Set(groupToDissolve.taskIds);
+        const newTasks = currentTasks.map(t => taskIdsInGroup.has(t.id) ? { ...t, groupId: undefined } : t);
+        const newGroups = currentTaskGroups.filter(g => g.id !== groupId);
+  
+        return { newTasks, newTaskGroups: newGroups };
+    });
   };
 
   const handleExportProject = (projectId: string) => {
