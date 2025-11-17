@@ -44,3 +44,6 @@ export interface ExecutingUnit {
   name: string;
   color: string;
 }
+
+// 用於儲存可撤銷的專案狀態快照
+export type ProjectStateSnapshot = Pick<Project, 'tasks' | 'taskGroups'>;

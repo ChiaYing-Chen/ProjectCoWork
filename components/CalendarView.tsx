@@ -40,6 +40,7 @@ interface CalendarViewProps {
   executingUnits: ExecutingUnit[];
   onDeleteSelectedTasks: (taskIds: number[]) => void;
   onExportSelectedTasks: (taskIds: number[]) => void;
+  isEditMode: boolean;
 }
 
 interface ResizingInfo {
@@ -68,6 +69,7 @@ const CalendarTask: React.FC<{
     onEditTask: (task: Task) => void;
     onUngroupTask: (taskId:number) => void;
     handleResizeMouseDown: (e: React.MouseEvent<HTMLDivElement>, task: Task, side: 'start' | 'end') => void;
+    isEditMode: boolean;
 }> = ({
     task,
     weekStart,
@@ -85,7 +87,8 @@ const CalendarTask: React.FC<{
     onSelectTask,
     onEditTask,
     onUngroupTask,
-    handleResizeMouseDown
+    handleResizeMouseDown,
+    isEditMode
 }) => {
     const [showTooltip, setShowTooltip] = useState(false);
     const tooltipTimer = useRef<number | null>(null);
@@ -134,14 +137,15 @@ const CalendarTask: React.FC<{
         top: `calc(${row * 2.25}rem)`,
         left: `calc(${(startDay / 7) * 100}% + 1px)`,
         width: `calc(${(span / 7) * 100}% - 2px)`,
+        cursor: isEditMode ? 'grab' : 'pointer',
     };
     
     return (
         <div
-           draggable={!isResizingThisTask}
+           draggable={isEditMode && !isResizingThisTask}
            data-task-id={task.id}
            onDragStart={(e) => {
-               if (isResizingThisTask) {
+               if (!isEditMode || isResizingThisTask) {
                    e.preventDefault();
                    return;
                }
@@ -158,8 +162,8 @@ const CalendarTask: React.FC<{
            <div className="absolute inset-0 w-full h-full" style={{backgroundColor: taskColor || '#3b82f6', borderLeft: group && isActualStart ? `4px solid ${group.color}` : 'none' }}></div>
            {isActualStart && (
                <div 
-                   onMouseDown={(e) => handleResizeMouseDown(e, task, 'start')}
-                   className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 opacity-50 hover:opacity-100 bg-black/20"
+                   onMouseDown={(e) => isEditMode && handleResizeMouseDown(e, task, 'start')}
+                   className={`absolute left-0 top-0 bottom-0 w-2 z-10 opacity-50 hover:opacity-100 bg-black/20 ${isEditMode ? 'cursor-col-resize' : 'cursor-default'}`}
                />
            )}
            <div className="relative px-2 font-semibold truncate w-full h-full flex items-center" style={{ paddingLeft: group && isActualStart ? '0.25rem' : '0.5rem' }}>
@@ -167,14 +171,14 @@ const CalendarTask: React.FC<{
            </div>
            {isActualEnd && (
                <div 
-                   onMouseDown={(e) => handleResizeMouseDown(e, task, 'end')}
-                   className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-10 opacity-50 hover:opacity-100 bg-black/20"
+                   onMouseDown={(e) => isEditMode && handleResizeMouseDown(e, task, 'end')}
+                   className={`absolute right-0 top-0 bottom-0 w-2 z-10 opacity-50 hover:opacity-100 bg-black/20 ${isEditMode ? 'cursor-col-resize' : 'cursor-default'}`}
                />
            )}
            
            {task.groupId && showText && (
              <button onClick={(e) => { e.stopPropagation(); onUngroupTask(task.id); }} className="absolute -top-1 -right-1 bg-white p-0.5 rounded-full text-slate-500 hover:text-red-500 transition-colors shadow z-20" title="從群組中移除">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+               <span className="text-xs">💔</span>
              </button>
            )}
            {showTooltip && task.notes && (
@@ -187,7 +191,7 @@ const CalendarTask: React.FC<{
 };
 
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, projectEndDate, warnings, onDragTask, onResizeTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, onExportSelectedTasks }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, projectEndDate, warnings, onDragTask, onResizeTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, onExportSelectedTasks, isEditMode }) => {
   const [touchedTaskIds, setTouchedTaskIds] = useState<Set<number>>(new Set());
   const [dayViewDate, setDayViewDate] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -328,6 +332,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   }, [filteredTasks, resizingInfo, resizePreview]);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: number) => {
+    if (!isEditMode) return;
     e.dataTransfer.setData('taskId', taskId.toString());
     e.dataTransfer.effectAllowed = 'move';
     // Use setTimeout to allow the browser to capture the drag image before we modify the element's style
@@ -337,6 +342,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   };
 
   const handleResizeMouseDown = (e: React.MouseEvent<HTMLDivElement>, task: Task, side: 'start' | 'end') => {
+      if (!isEditMode) return;
       e.preventDefault();
       e.stopPropagation();
       setResizingInfo({
@@ -348,20 +354,24 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, day: Date) => {
     e.preventDefault();
+    if (!isEditMode) {
+      setDraggingTaskId(null);
+      return;
+    }
     const taskId = parseInt(e.dataTransfer.getData('taskId'), 10);
     if (taskId) {
         onDragTask(taskId, day);
     }
-    // BUG FIX: Reset dragging state immediately on drop.
-    // The state update from `onDragTask` can cause a re-render that prevents
-    // the `onDragEnd` event on the original task item from firing correctly.
-    // This ensures the UI becomes interactive again after a successful drop.
     setDraggingTaskId(null);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    if (isEditMode) {
+      e.dataTransfer.dropEffect = 'move';
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+    }
   };
 
   const getTaskIdsFromTouches = useCallback((touches: React.TouchList): Set<number> => {
@@ -491,14 +501,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
             aria-controls="filter-panel"
           >
             <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L16 11.414V16a1 1 0 01-.293.707l-2 2A1 1 0 0112 18v-1.586l-3.707-3.707A1 1 0 018 12V6.414L3.293 4.707A1 1 0 013 4z" />
-              </svg>
+              <span className="text-lg mr-2">🎨</span>
               <span>圖例與篩選</span>
             </div>
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-slate-500 transform transition-transform duration-300 ${isFilterVisible ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <span className={`text-base text-slate-500 transform transition-transform duration-300 ${isFilterVisible ? 'rotate-180' : ''}`}>▼</span>
           </button>
           <div
             id="filter-panel"
@@ -551,9 +557,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
             {selectedTaskIds.length > 0 && (
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 z-10">
                   <div className="bg-white p-2 rounded-lg shadow-lg flex items-center space-x-2 border border-slate-200">
-                      <button onClick={() => onExportSelectedTasks(selectedTaskIds)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center" title="將選取的任務匯出為 .ics 檔案"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>匯出</button>
-                      <button onClick={handleDeleteClick} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center" title="刪除選取的任務"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>刪除</button>
-                      {selectedTaskIds.length > 1 && (<button onClick={onCreateGroup} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center" title="將選取的任務建立時間關聯"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" /></svg>關聯</button>)}
+                      <span className="text-sm font-semibold text-slate-600 px-2">
+                          已選({selectedTaskIds.length})
+                      </span>
+                      <div className="w-px h-6 bg-slate-200"></div>
+                      <button onClick={() => onExportSelectedTasks(selectedTaskIds)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center" title="將選取的任務匯出為 .ics 檔案"><span className="mr-2">📤</span>匯出</button>
+                      <button onClick={handleDeleteClick} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center" title="刪除選取的任務"><span className="mr-2">🗑️</span>刪除</button>
+                      {selectedTaskIds.length > 1 && (<button onClick={onCreateGroup} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 text-sm flex items-center" title="將選取的任務建立時間關聯"><span className="mr-2">🔗</span>關聯</button>)}
                   </div>
                 </div>
             )}
@@ -602,7 +612,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
 
                 return (
                   <div key={weekStart.toISOString()} className="flex border-t border-slate-200">
-                     <div className="w-4 flex-shrink-0" style={{ backgroundColor: monthColorMap.get(format(monthOfFirstDay, 'yyyy-MM')) || '#64748b' }}></div>
+                     <div className="w-2.5 flex-shrink-0" style={{ backgroundColor: monthColorMap.get(format(monthOfFirstDay, 'yyyy-MM')) || '#64748b' }}></div>
                      <div className="grid grid-cols-7 flex-grow relative" style={{ minHeight: weekHeight }}>
                       {week.map((day) => (
                         <div
@@ -640,6 +650,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                                   onEditTask={onEditTask}
                                   onUngroupTask={onUngroupTask}
                                   handleResizeMouseDown={handleResizeMouseDown}
+                                  isEditMode={isEditMode}
                               />
                            );
                         })}

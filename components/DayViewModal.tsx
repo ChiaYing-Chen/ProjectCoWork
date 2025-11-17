@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Task, TaskGroup, ExecutingUnit } from '../types';
 import { format } from 'date-fns';
@@ -97,9 +98,7 @@ const DayViewModal: React.FC<DayViewModalProps> = ({
                 onClick={() => onAddTaskForDate(date)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition flex items-center"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <span className="mr-2">➕</span>
                 新增任務
             </button>
         </div>

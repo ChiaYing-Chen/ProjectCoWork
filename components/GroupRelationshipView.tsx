@@ -1,12 +1,12 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Task, TaskGroup } from '../types';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, isAfter } from 'date-fns';
 
 interface GroupRelationshipViewProps {
   tasks: Task[];
   taskGroups: TaskGroup[];
   onUpdateGroup: (groupId: string, updates: Partial<Pick<TaskGroup, 'name'>>) => void;
+  onUpdateTask: (taskId: number, updates: Partial<Pick<Task, 'name' | 'start' | 'end'>>) => void;
   onUpdateTaskInterval: (groupId: string, previousTaskId: number, taskToShiftId: number, newInterval: number) => void;
   onReorderTasks: (groupId: string, newOrderedTaskIds: number[]) => void;
   onDeleteGroup: (groupId: string) => void;
@@ -19,14 +19,21 @@ const EditableText: React.FC<{ value: string, onSave: (newValue: string) => void
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleSave = () => {
-        if (text.trim()) {
+        if (text.trim() && text.trim() !== value) {
             onSave(text.trim());
         } else {
-            setText(value); // Revert if empty
+            setText(value); // Revert if empty or unchanged
         }
         setIsEditing(false);
     };
 
+    useEffect(() => {
+        if (isEditing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [isEditing]);
+    
     if (isEditing) {
         return (
             <input
@@ -35,21 +42,26 @@ const EditableText: React.FC<{ value: string, onSave: (newValue: string) => void
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onBlur={handleSave}
-                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                className="text-xl font-bold bg-transparent border-b-2 border-blue-500 focus:outline-none"
-                autoFocus
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSave();
+                    if (e.key === 'Escape') {
+                        setText(value);
+                        setIsEditing(false);
+                    }
+                }}
+                className={`${textClasses} bg-transparent border-b-2 border-blue-500 focus:outline-none w-full`}
             />
         );
     }
 
     return (
-        <div onClick={() => setIsEditing(true)} className={`${textClasses} cursor-pointer`}>
+        <div onClick={() => setIsEditing(true)} className={`${textClasses} cursor-pointer hover:bg-slate-100 rounded-md -m-1 p-1 truncate`}>
             {value || <span className="text-slate-400">{placeholder}</span>}
         </div>
     );
 };
 
-const GroupRelationshipView: React.FC<GroupRelationshipViewProps> = ({ tasks, taskGroups, onUpdateGroup, onUpdateTaskInterval, onReorderTasks, onDeleteGroup, onUngroupTask }) => {
+const GroupRelationshipView: React.FC<GroupRelationshipViewProps> = ({ tasks, taskGroups, onUpdateGroup, onUpdateTask, onUpdateTaskInterval, onReorderTasks, onDeleteGroup, onUngroupTask }) => {
   const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<number | null>(null);
 
@@ -122,7 +134,7 @@ const GroupRelationshipView: React.FC<GroupRelationshipViewProps> = ({ tasks, ta
                     className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
                     title="刪除此群組"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg>
+                    <span className="text-lg">🗑️</span>
                 </button>
             </div>
             <div className="space-y-2" onDragEnd={handleDragEnd}>
@@ -136,12 +148,45 @@ const GroupRelationshipView: React.FC<GroupRelationshipViewProps> = ({ tasks, ta
                     onDrop={(e) => handleDrop(e, group, task.id)}
                     className={`flex items-center flex-wrap sm:flex-nowrap gap-x-4 gap-y-2 p-2 rounded-lg transition-all duration-200 group ${draggedItemId === task.id ? 'opacity-30' : ''} ${dragOverItemId === task.id ? 'bg-blue-50' : ''}`}
                   >
-                    <div className="w-8 flex-shrink-0 cursor-grab text-slate-400 group-hover:text-slate-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM13 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2h-2z" /></svg>
+                    <div className="w-8 flex-shrink-0 cursor-grab text-slate-400 group-hover:text-slate-600 flex items-center justify-center">
+                        <span className="text-lg">⠿</span>
                     </div>
-                    <div className="flex-shrink-0 w-32 text-right">
-                        <p className="font-semibold text-slate-700">{task.name}</p>
-                        <p className="text-sm text-slate-500">{format(task.start, 'MM/dd')} - {format(task.end, 'MM/dd')}</p>
+                    <div className="flex-shrink-0 w-64">
+                        <EditableText
+                            value={task.name}
+                            onSave={(newName) => onUpdateTask(task.id, { name: newName })}
+                            placeholder="任務名稱"
+                            textClasses="font-semibold text-slate-700"
+                        />
+                        <div className="text-sm text-slate-500 flex items-center gap-1 mt-1">
+                            <input
+                                type="date"
+                                value={format(task.start, 'yyyy-MM-dd')}
+                                onChange={(e) => {
+                                    const newStartDate = new Date(e.target.value + 'T00:00:00');
+                                    if (!isNaN(newStartDate.getTime())) {
+                                        const newEndDate = isAfter(newStartDate, task.end) ? newStartDate : task.end;
+                                        onUpdateTask(task.id, { start: newStartDate, end: newEndDate });
+                                    }
+                                }}
+                                className="bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded p-1 cursor-pointer w-full text-xs"
+                                aria-label="任務開始日期"
+                            />
+                            <span>-</span>
+                            <input
+                                type="date"
+                                value={format(task.end, 'yyyy-MM-dd')}
+                                min={format(task.start, 'yyyy-MM-dd')}
+                                onChange={(e) => {
+                                    const newEndDate = new Date(e.target.value + 'T00:00:00');
+                                    if (!isNaN(newEndDate.getTime())) {
+                                        onUpdateTask(task.id, { end: newEndDate });
+                                    }
+                                }}
+                                className="bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded p-1 cursor-pointer w-full text-xs"
+                                aria-label="任務結束日期"
+                            />
+                        </div>
                     </div>
                     <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: group.color }}>
                         {taskIndex + 1}
@@ -152,7 +197,7 @@ const GroupRelationshipView: React.FC<GroupRelationshipViewProps> = ({ tasks, ta
                         </p>
                     </div>
                     <button onClick={() => onUngroupTask(task.id)} className="p-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-opacity" title="從群組中移除">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                        <span className="text-lg">💔</span>
                     </button>
                   </div>
 
