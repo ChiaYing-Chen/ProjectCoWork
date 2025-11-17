@@ -91,8 +91,8 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center space-x-4 min-w-0">
             {project ? (
                <>
-                <button onClick={onBackToProjects} className="flex items-center justify-center text-slate-500 hover:text-blue-600 transition duration-300 p-2 -ml-2 rounded-full flex-shrink-0 w-9 h-9" title="返回專案列表">
-                    <span className="text-xl">🗂️</span>
+                <button onClick={onBackToProjects} className="flex items-center justify-center text-slate-500 hover:text-blue-600 transition duration-300 p-1.5 -ml-1.5 rounded-full flex-shrink-0 w-7 h-7" title="返回專案列表">
+                    <span className="text-sm">🗂️</span>
                 </button>
                 <div className="flex items-baseline space-x-4 min-w-0">
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-800 truncate">{project.name}</h1>
@@ -121,15 +121,15 @@ const Header: React.FC<HeaderProps> = ({
             <div className="relative" ref={fileMenuRef}>
                 <button
                     onClick={() => setIsFileMenuOpen(p => !p)}
-                    className="flex items-center bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-sm min-w-[50px] sm:min-w-[120px] justify-center sm:justify-between"
+                    className="flex items-center bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold py-1 px-2.5 h-7 text-sm rounded-md transition duration-300 shadow-sm min-w-[45px] sm:min-w-[90px] justify-center"
                     aria-haspopup="true"
                     aria-expanded={isFileMenuOpen}
                 >
                     <div className="flex items-center">
-                        <span className="hidden sm:inline">📃檔案</span>
-                        <span className="sm:hidden text-lg">📃</span>
+                        <span className="text-sm">📃</span>
+                        <span className="ml-2 hidden sm:inline">檔案</span>
                     </div>
-                    <span className="ml-0 sm:ml-2 text-slate-400 text-xs">▼</span>
+                    <span className="ml-2 text-slate-400 text-xs">▼</span>
                 </button>
                 {isFileMenuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-50 border border-slate-200">
@@ -166,19 +166,19 @@ const Header: React.FC<HeaderProps> = ({
                             {canUndo && (
                                 <button
                                     onClick={onUndo}
-                                    className="p-2 w-9 h-9 flex items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100"
+                                    className="p-1.5 w-7 h-7 flex items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100"
                                     title="恢復上一步 (Ctrl+Z)"
                                 >
-                                    <span className="text-xl">↩️</span>
+                                    <span className="text-sm">↩️</span>
                                 </button>
                             )}
                             {canRedo && (
                                 <button
                                     onClick={onRedo}
-                                    className="p-2 w-9 h-9 flex items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100"
+                                    className="p-1.5 w-7 h-7 flex items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100"
                                     title="重做"
                                 >
-                                    <span className="text-xl">↪️</span>
+                                    <span className="text-sm">↪️</span>
                                 </button>
                             )}
                         </div>
@@ -187,15 +187,15 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="relative" ref={viewModeMenuRef}>
                         <button
                             onClick={() => setIsViewModeMenuOpen(prev => !prev)}
-                            className="flex items-center bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-sm min-w-[50px] sm:min-w-[120px] justify-center sm:justify-between"
+                            className="flex items-center bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold py-1 px-2.5 h-7 text-sm rounded-md transition duration-300 shadow-sm min-w-[45px] sm:min-w-[110px] justify-center"
                             aria-haspopup="true"
                             aria-expanded={isViewModeMenuOpen}
                         >
                             <div className="flex items-center">
-                                <span className="text-xl">{currentView.icon}</span>
+                                <span className="text-sm">{currentView.icon}</span>
                                 <span className="ml-2 hidden sm:inline">{currentView.label}</span>
                             </div>
-                            <span className="ml-0 sm:ml-2 text-slate-400 text-xs">▼</span>
+                            <span className="ml-2 text-slate-400 text-xs">▼</span>
                         </button>
                         {isViewModeMenuOpen && (
                             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-slate-200">
@@ -210,7 +210,7 @@ const Header: React.FC<HeaderProps> = ({
                                                 className={`w-full text-left flex items-center px-4 py-2 text-sm ${viewMode === mode ? 'font-bold text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-slate-100'}`}
                                                 role="menuitem"
                                             >
-                                                <span className="text-xl w-5 text-center">{viewModeOptions[mode].icon}</span>
+                                                <span className="text-lg w-5 text-center">{viewModeOptions[mode].icon}</span>
                                                 <span className="ml-3">{viewModeOptions[mode].label}</span>
                                             </button>
                                         </li>
@@ -221,32 +221,26 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                     <button
                         onClick={onToggleEditMode}
-                        className={`flex items-center border border-slate-300 font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-sm min-w-[50px] sm:min-w-[90px] justify-center ${
+                        className={`flex items-center justify-center w-7 h-7 border border-slate-200 text-sm rounded-md transition duration-300 shadow-sm ${
                         isEditMode
                             ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-300'
                             : 'bg-white hover:bg-slate-50 text-slate-700'
                         }`}
                         title={isEditMode ? "目前為拖拉模式。點擊以鎖定。" : "目前為點擊模式。點擊以啟用拖拉。"}
                     >
-                        {isEditMode ? (
-                        <>
-                            <span className="text-lg sm:hidden">👆</span>
-                            <span className="hidden sm:inline">👆拖拉</span>
-                        </>
-                        ) : (
-                        <>
-                            <span className="text-lg sm:hidden">✏️</span>
-                            <span className="hidden sm:inline">✏️點擊</span>
-                        </>
-                        )}
+                        <span className="text-sm">
+                            {isEditMode ? '👆' : '✏️'}
+                        </span>
                     </button>
                 </>
             )}
             <div className="flex items-center space-x-2 pl-2 border-l border-slate-200 ml-2">
                 {onOpenSettings && (
-                    <button onClick={onOpenSettings} className="flex items-center text-slate-700 hover:bg-slate-100 font-semibold p-2 sm:py-2 sm:px-3 rounded-lg transition-colors duration-200" title="設定">
-                        <span className="sm:hidden">⚙️</span>
-                        <span className="hidden sm:inline">⚙️設定</span>
+                    <button onClick={onOpenSettings} className="flex items-center text-slate-700 hover:bg-slate-100 font-semibold py-1 px-2.5 h-7 text-sm rounded-md transition-colors duration-200" title="設定">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm">⚙️</span>
+                            <span className="hidden sm:inline">設定</span>
+                        </div>
                     </button>
                 )}
             </div>

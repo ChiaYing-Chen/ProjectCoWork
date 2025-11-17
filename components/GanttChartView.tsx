@@ -31,19 +31,32 @@ const GanttTaskBar: React.FC<GanttTaskBarProps> = ({ task, isWarning, left, widt
   const tooltipTimer = useRef<number | null>(null);
 
   const handleMouseEnter = () => {
+    if (tooltipTimer.current) {
+      clearTimeout(tooltipTimer.current);
+    }
     if (task.notes) {
       tooltipTimer.current = window.setTimeout(() => {
         setShowTooltip(true);
-      }, 1500);
+      }, 1000);
     }
   };
 
   const handleMouseLeave = () => {
     if (tooltipTimer.current) {
       clearTimeout(tooltipTimer.current);
+      tooltipTimer.current = null;
     }
     setShowTooltip(false);
   };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimer.current) {
+        clearTimeout(tooltipTimer.current);
+      }
+    };
+  }, []);
 
   return (
     <div

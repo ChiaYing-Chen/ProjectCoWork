@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Task, Warning, TaskGroup, ExecutingUnit } from '../types';
 import DayViewModal from './DayViewModal';
@@ -93,7 +91,16 @@ const CalendarTask: React.FC<{
     const [showTooltip, setShowTooltip] = useState(false);
     const tooltipTimer = useRef<number | null>(null);
 
-    const handleMouseEnter = () => { if (task.notes) { tooltipTimer.current = window.setTimeout(() => setShowTooltip(true), 1500); } };
+    const handleMouseEnter = () => {
+        if (tooltipTimer.current) {
+            clearTimeout(tooltipTimer.current);
+        }
+        if (task.notes) {
+            tooltipTimer.current = window.setTimeout(() => {
+                setShowTooltip(true);
+            }, 1000);
+        }
+    };
     const handleMouseLeave = () => {
         if (tooltipTimer.current) {
             clearTimeout(tooltipTimer.current);
@@ -155,9 +162,8 @@ const CalendarTask: React.FC<{
            onClick={(e) => onSelectTask(task.id, e.ctrlKey || e.metaKey)}
            onDoubleClick={() => onEditTask(task)}
            onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}
-           className={`group absolute h-8 flex items-center text-xs text-white transition-all duration-200 ${borderRadiusClasses} ${dynamicClasses} ${dragClasses} overflow-hidden`}
+           className={`group absolute h-8 flex items-center text-xs text-white transition-all duration-200 ${borderRadiusClasses} ${dynamicClasses} ${dragClasses}`}
            style={style}
-           title={task.name}
        >
            <div className="absolute inset-0 w-full h-full" style={{backgroundColor: taskColor || '#3b82f6', borderLeft: group && isActualStart ? `4px solid ${group.color}` : 'none' }}></div>
            {isActualStart && (
@@ -491,12 +497,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   }, [projectStartDate, projectEndDate, allMonths]);
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 flex flex-col view-container" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="bg-white rounded-lg shadow-lg p-2 sm:p-4 flex flex-col view-container" style={{ height: 'calc(100vh - 120px)' }}>
       {(unitsInUse.length > 0 || allMonths.length > 0) && (
-        <div className="bg-slate-50 rounded-md border border-slate-200 mb-2 flex-shrink-0">
+        <div className="bg-slate-50 rounded-md border border-slate-200 mb-1 flex-shrink-0">
           <button
             onClick={() => setIsFilterVisible(!isFilterVisible)}
-            className="w-full flex items-center justify-between p-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
+            className="w-full flex items-center justify-between p-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
             aria-expanded={isFilterVisible}
             aria-controls="filter-panel"
           >
@@ -510,7 +516,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
             id="filter-panel"
             className={`transition-all duration-300 ease-in-out overflow-hidden ${isFilterVisible ? 'max-h-[500px]' : 'max-h-0'}`}
           >
-            <div className="p-4 border-t border-slate-200 flex-shrink-0 flex">
+            <div className="p-3 border-t border-slate-200 flex-shrink-0 flex">
               {allMonths.length > 0 && (
                   <div className="w-1/4 pr-4 flex-shrink-0">
                       <div className="flex flex-col space-y-2">
@@ -627,7 +633,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                           <div className={`text-sm text-right ${!isSameMonth(day, monthOfFirstDay) ? 'text-slate-400' : 'text-slate-700'}`}>{format(day, 'd')}</div>
                         </div>
                       ))}
-                      <div className={`absolute top-0 left-0 right-0 bottom-0 mt-[1.75rem] px-1 space-y-1 ${draggingTaskId !== null ? 'pointer-events-none' : ''}`}>
+                      <div className={`absolute top-0 left-0 right-0 bottom-0 mt-[1.75rem] px-1 ${draggingTaskId !== null ? 'pointer-events-none' : ''}`}>
                         {taskLayoutRows.map(({ task, row, startDay, span }) => {
                            const isResizingThisTask = resizingInfo?.taskId === task.id;
                            return (
