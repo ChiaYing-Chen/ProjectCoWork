@@ -335,6 +335,24 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleResizeTask = (taskId: number, newStartDate: Date, newEndDate: Date) => {
+    setProjects(prevProjects => prevProjects.map(p => {
+        if (p.id !== currentProjectIdRef.current) return p;
+
+        const updatedTasks = p.tasks.map(task =>
+            task.id === taskId ? { ...task, start: newStartDate, end: newEndDate } : task
+        );
+        
+        checkForWarnings(updatedTasks);
+        return {
+            ...p,
+            tasks: updatedTasks,
+            lastModified: new Date(),
+            lastModifiedBy: modifierName,
+        };
+    }));
+  };
+
   const handleSelectTask = useCallback((taskId: number, isCtrlOrMetaKey: boolean) => {
     if (isCtrlOrMetaKey) {
         setSelectedTaskIds(prev => 
@@ -924,6 +942,7 @@ const App: React.FC = () => {
                 projectEndDate={currentProject.endDate}
                 warnings={warnings} 
                 onDragTask={handleDragTask} 
+                onResizeTask={handleResizeTask}
                 selectedTaskIds={selectedTaskIds}
                 onSelectTask={handleSelectTask}
                 onMultiSelectTasks={handleMultiSelectTasks}
