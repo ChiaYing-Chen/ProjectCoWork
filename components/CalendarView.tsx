@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Task, Warning, TaskGroup, ExecutingUnit } from '../types';
 import DayViewModal from './DayViewModal';
@@ -49,6 +50,142 @@ interface ResizingInfo {
 
 const MONTH_COLORS = ['#4f46e5', '#db2777', '#16a34a', '#d97706', '#6d28d9', '#0891b2', '#ca8a04', '#be185d'];
 
+const CalendarTask: React.FC<{
+    task: Task;
+    weekStart: Date;
+    startDay: number;
+    span: number;
+    row: number;
+    draggingTaskId: number | null;
+    isResizingThisTask: boolean;
+    touchedTaskIds: Set<number>;
+    selectedTaskIds: number[];
+    taskGroupMap: Map<string, TaskGroup>;
+    unitColorMap: Map<string, string>;
+    onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: number) => void;
+    setDraggingTaskId: (id: number | null) => void;
+    onSelectTask: (taskId: number, isCtrlOrMetaKey: boolean) => void;
+    onEditTask: (task: Task) => void;
+    onUngroupTask: (taskId:number) => void;
+    handleResizeMouseDown: (e: React.MouseEvent<HTMLDivElement>, task: Task, side: 'start' | 'end') => void;
+}> = ({
+    task,
+    weekStart,
+    startDay,
+    span,
+    row,
+    draggingTaskId,
+    isResizingThisTask,
+    touchedTaskIds,
+    selectedTaskIds,
+    taskGroupMap,
+    unitColorMap,
+    onDragStart,
+    setDraggingTaskId,
+    onSelectTask,
+    onEditTask,
+    onUngroupTask,
+    handleResizeMouseDown
+}) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const tooltipTimer = useRef<number | null>(null);
+
+    const handleMouseEnter = () => { if (task.notes) { tooltipTimer.current = window.setTimeout(() => setShowTooltip(true), 1500); } };
+    const handleMouseLeave = () => {
+        if (tooltipTimer.current) {
+            clearTimeout(tooltipTimer.current);
+            tooltipTimer.current = null;
+        }
+        setShowTooltip(false);
+    };
+    
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (tooltipTimer.current) {
+                clearTimeout(tooltipTimer.current);
+            }
+        };
+    }, []);
+
+    const isActualStart = isSameDay(task.start, addDays(weekStart, startDay));
+    const isActualEnd = isSameDay(task.end, addDays(weekStart, startDay + span - 1));
+
+    let borderRadiusClasses = '';
+    if (isActualStart) borderRadiusClasses += ' rounded-l-lg';
+    if (isActualEnd) borderRadiusClasses += ' rounded-r-lg';
+    if (isActualStart && isActualEnd) borderRadiusClasses = 'rounded-lg';
+
+    const showText = isActualStart || startDay === 0;
+    const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
+    const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
+
+    const isDraggingThisTask = draggingTaskId === task.id;
+
+    const dynamicClasses = touchedTaskIds.has(task.id)
+        ? 'transform scale-105 ring-2 ring-yellow-400 ring-offset-2 z-10 shadow-lg'
+        : selectedTaskIds.includes(task.id)
+        ? 'ring-2 ring-offset-1 ring-blue-500 z-10'
+        : 'shadow-sm hover:shadow-md';
+
+    const dragClasses = isDraggingThisTask ? 'opacity-40' : '';
+
+    const style: React.CSSProperties = {
+        top: `calc(${row * 2.25}rem)`,
+        left: `calc(${(startDay / 7) * 100}% + 1px)`,
+        width: `calc(${(span / 7) * 100}% - 2px)`,
+    };
+    
+    return (
+        <div
+           draggable={!isResizingThisTask}
+           data-task-id={task.id}
+           onDragStart={(e) => {
+               if (isResizingThisTask) {
+                   e.preventDefault();
+                   return;
+               }
+               onDragStart(e, task.id);
+           }}
+           onDragEnd={() => setDraggingTaskId(null)}
+           onClick={(e) => onSelectTask(task.id, e.ctrlKey || e.metaKey)}
+           onDoubleClick={() => onEditTask(task)}
+           onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}
+           className={`group absolute h-8 flex items-center text-xs text-white transition-all duration-200 ${borderRadiusClasses} ${dynamicClasses} ${dragClasses} overflow-hidden`}
+           style={style}
+           title={task.name}
+       >
+           <div className="absolute inset-0 w-full h-full" style={{backgroundColor: taskColor || '#3b82f6', borderLeft: group && isActualStart ? `4px solid ${group.color}` : 'none' }}></div>
+           {isActualStart && (
+               <div 
+                   onMouseDown={(e) => handleResizeMouseDown(e, task, 'start')}
+                   className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 opacity-50 hover:opacity-100 bg-black/20"
+               />
+           )}
+           <div className="relative px-2 font-semibold truncate w-full h-full flex items-center" style={{ paddingLeft: group && isActualStart ? '0.25rem' : '0.5rem' }}>
+             {showText ? task.name : ''}
+           </div>
+           {isActualEnd && (
+               <div 
+                   onMouseDown={(e) => handleResizeMouseDown(e, task, 'end')}
+                   className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-10 opacity-50 hover:opacity-100 bg-black/20"
+               />
+           )}
+           
+           {task.groupId && showText && (
+             <button onClick={(e) => { e.stopPropagation(); onUngroupTask(task.id); }} className="absolute -top-1 -right-1 bg-white p-0.5 rounded-full text-slate-500 hover:text-red-500 transition-colors shadow z-20" title="從群組中移除">
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+             </button>
+           )}
+           {showTooltip && task.notes && (
+             <div className="absolute bottom-full mb-2 w-max max-w-xs bg-slate-800 text-white text-xs rounded py-1 px-2 z-50 shadow-lg whitespace-pre-wrap" style={{ left: 0 }}>
+               {task.notes}
+             </div>
+           )}
+       </div>
+    );
+};
+
 
 const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, projectEndDate, warnings, onDragTask, onResizeTask, selectedTaskIds, onSelectTask, onMultiSelectTasks, onCreateGroup, onOpenAddTaskModal, onUngroupTask, taskGroups, onEditTask, executingUnits, onDeleteSelectedTasks, onExportSelectedTasks }) => {
   const [touchedTaskIds, setTouchedTaskIds] = useState<Set<number>>(new Set());
@@ -59,10 +196,19 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   const today = useMemo(() => new Date(), []);
   
   const [deselectedUnits, setDeselectedUnits] = useState<Set<string>>(new Set());
-  const [deselectedMonths, setDeselectedMonths] = useState<Set<string>>(new Set());
   const [isFilterVisible, setIsFilterVisible] = useState(true);
   const [resizingInfo, setResizingInfo] = useState<ResizingInfo | null>(null);
   const [resizePreview, setResizePreview] = useState<{ start: Date; end: Date } | null>(null);
+  const [draggingTaskId, setDraggingTaskId] = useState<number | null>(null);
+
+  // Ref to hold all resizing data to avoid stale closures in event handlers
+  const resizeStateRef = useRef<{ info: ResizingInfo | null, preview: { start: Date; end: Date } | null }>({ info: null, preview: null });
+  useEffect(() => {
+    // Keep the ref in sync with the state
+    resizeStateRef.current.info = resizingInfo;
+    resizeStateRef.current.preview = resizePreview;
+  }, [resizingInfo, resizePreview]);
+
 
   const allMonths = useMemo(() => {
     const months = [];
@@ -91,45 +237,50 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   // Effect to handle global mouse events for resizing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!resizingInfo) return;
+      const currentInfo = resizeStateRef.current.info;
+      if (!currentInfo) return;
 
-      const targetElement = document.elementFromPoint(e.clientX, e.clientY);
-      const dayCell = targetElement?.closest<HTMLElement>('[data-date]');
+      // Use elementsFromPoint to find the day cell even if it's under other elements
+      const elements = document.elementsFromPoint(e.clientX, e.clientY);
+      const dayCell = elements.find(el => el.hasAttribute('data-date')) as HTMLElement | undefined;
       
       if (dayCell && dayCell.dataset.date) {
         const currentDate = parseISO(dayCell.dataset.date);
-        const { side, originalTask } = resizingInfo;
+        const { side, originalTask } = currentInfo;
         
+        let newPreview;
         if (side === 'start') {
-          setResizePreview({
+          newPreview = {
             start: isAfter(currentDate, originalTask.end) ? originalTask.end : currentDate,
             end: originalTask.end,
-          });
+          };
         } else { // side === 'end'
-          setResizePreview({
+          newPreview = {
             start: originalTask.start,
             end: isBefore(currentDate, originalTask.start) ? originalTask.start : currentDate,
-          });
+          };
         }
+        // Set state to trigger visual update
+        setResizePreview(newPreview);
       }
     };
 
     const handleMouseUp = () => {
-      if (!resizingInfo || !resizePreview) {
-        setResizingInfo(null);
-        setResizePreview(null);
-        return;
+      const { info, preview } = resizeStateRef.current;
+      if (info && preview) {
+        onResizeTask(info.taskId, preview.start, preview.end);
       }
-      onResizeTask(resizingInfo.taskId, resizePreview.start, resizePreview.end);
       
-      // Cleanup
+      // Cleanup state
       setResizingInfo(null);
       setResizePreview(null);
     };
 
+    // Only attach listeners when resizingInfo is active
     if (resizingInfo) {
       // Initialize preview state when resizing starts
       setResizePreview({ start: resizingInfo.originalTask.start, end: resizingInfo.originalTask.end });
+      
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'col-resize';
@@ -137,6 +288,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
     }
 
     return () => {
+      // Cleanup listeners and styles
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = '';
@@ -152,18 +304,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         newSet.delete(unitName);
       } else {
         newSet.add(unitName);
-      }
-      return newSet;
-    });
-  };
-
-  const handleToggleMonth = (monthKey: string) => {
-    setDeselectedMonths(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(monthKey)) {
-        newSet.delete(monthKey);
-      } else {
-        newSet.add(monthKey);
       }
       return newSet;
     });
@@ -190,6 +330,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: number) => {
     e.dataTransfer.setData('taskId', taskId.toString());
     e.dataTransfer.effectAllowed = 'move';
+    // Use setTimeout to allow the browser to capture the drag image before we modify the element's style
+    setTimeout(() => {
+        setDraggingTaskId(taskId);
+    }, 0);
   };
 
   const handleResizeMouseDown = (e: React.MouseEvent<HTMLDivElement>, task: Task, side: 'start' | 'end') => {
@@ -208,6 +352,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
     if (taskId) {
         onDragTask(taskId, day);
     }
+    // BUG FIX: Reset dragging state immediately on drop.
+    // The state update from `onDragTask` can cause a re-render that prevents
+    // the `onDragEnd` event on the original task item from firing correctly.
+    // This ensures the UI becomes interactive again after a successful drop.
+    setDraggingTaskId(null);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -315,27 +464,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
     return map;
   }, [allMonths]);
 
-  const calendarDays = useMemo(() => {
+  const monthlyData = useMemo(() => {
     if (!projectStartDate || !projectEndDate) return [];
-    
-    const visibleMonths = allMonths.filter(month => !deselectedMonths.has(format(month, 'yyyy-MM')));
-    if (visibleMonths.length === 0) return [];
-    
-    const firstMonth = visibleMonths[0];
-    const lastMonth = visibleMonths[visibleMonths.length - 1];
-    
-    const start = startOfWeek(startOfMonth(firstMonth));
-    const end = endOfWeek(endOfMonth(lastMonth));
-    return eachDayOfInterval({ start, end });
-  }, [projectStartDate, projectEndDate, allMonths, deselectedMonths]);
 
-  const weeks = useMemo(() => {
-    const chunks: Date[][] = [];
-    for (let i = 0; i < calendarDays.length; i += 7) {
-      chunks.push(calendarDays.slice(i, i + 7));
-    }
-    return chunks;
-  }, [calendarDays]);
+    return allMonths.map(monthDate => {
+        const start = startOfWeek(startOfMonth(monthDate));
+        const end = endOfWeek(endOfMonth(monthDate));
+        const days = eachDayOfInterval({ start, end });
+        
+        const monthWeeks: Date[][] = [];
+        for (let i = 0; i < days.length; i += 7) {
+            monthWeeks.push(days.slice(i, i + 7));
+        }
+        return { month: monthDate, weeks: monthWeeks };
+    });
+  }, [projectStartDate, projectEndDate, allMonths]);
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 flex flex-col view-container" style={{ height: 'calc(100vh - 120px)' }}>
@@ -366,12 +509,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                   <div className="w-1/4 pr-4 flex-shrink-0">
                       <div className="flex flex-col space-y-2">
                           {Array.from(monthColorMap.entries()).map(([monthKey, color]) => (
-                              <button key={monthKey} className="flex items-center cursor-pointer p-1 rounded-md hover:bg-slate-200 transition-colors text-left" onClick={() => handleToggleMonth(monthKey)}>
+                              <div key={monthKey} className="flex items-center p-1 rounded-md text-left">
                                   <div className="w-4 h-4 rounded-sm mr-2 shadow-inner flex-shrink-0" style={{ backgroundColor: color }}></div>
-                                  <span className={`text-sm text-slate-600 ${deselectedMonths.has(monthKey) ? 'line-through text-slate-400' : ''}`}>
+                                  <span className="text-sm text-slate-600">
                                       {format(new Date(monthKey + '-01T00:00:00'), 'yyyy / M', { locale: zhTW })}
                                   </span>
-                              </button>
+                              </div>
                           ))}
                       </div>
                   </div>
@@ -421,144 +564,92 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         </div>
 
         <div>
-          {weeks.map((week, weekIndex) => {
-            const weekStart = week[0];
-            const weekEnd = week[6];
+          {monthlyData.map(({ month, weeks }) => (
+            <React.Fragment key={month.toISOString()}>
+              {weeks.map((week) => {
+                const weekStart = week[0];
+                const weekEnd = week[6];
 
-            const tasksInWeek = tasksToRender
-              .filter(task => task.start <= weekEnd && task.end >= weekStart)
-              .sort((a, b) => a.start.getTime() - b.start.getTime() || (b.end.getTime() - a.start.getTime()) - (a.end.getTime() - a.start.getTime()));
+                const tasksInWeek = tasksToRender
+                  .filter(task => task.start <= weekEnd && task.end >= weekStart)
+                  .sort((a, b) => a.start.getTime() - b.start.getTime() || (b.end.getTime() - a.start.getTime()) - (a.end.getTime() - a.start.getTime()));
 
-            const taskLayoutRows: { task: Task, row: number, startDay: number, span: number }[] = [];
-            const rows: (Task | null)[][] = [];
+                const taskLayoutRows: { task: Task, row: number, startDay: number, span: number }[] = [];
+                const rows: (Task | null)[][] = [];
 
-            tasksInWeek.forEach(task => {
-              const startDay = isBefore(task.start, weekStart) ? 0 : differenceInDays(task.start, weekStart);
-              const endDay = isAfter(task.end, weekEnd) ? 6 : differenceInDays(task.end, weekStart);
+                tasksInWeek.forEach(task => {
+                  const startDay = isBefore(task.start, weekStart) ? 0 : differenceInDays(task.start, weekStart);
+                  const endDay = isAfter(task.end, weekEnd) ? 6 : differenceInDays(task.end, weekStart);
 
-              let targetRow = 0;
-              while (true) {
-                if (rows.length <= targetRow) rows.push(Array(7).fill(null));
+                  let targetRow = 0;
+                  while (true) {
+                    if (rows.length <= targetRow) rows.push(Array(7).fill(null));
 
-                const canPlace = !rows[targetRow].slice(startDay, endDay + 1).some(Boolean);
+                    const canPlace = !rows[targetRow].slice(startDay, endDay + 1).some(Boolean);
 
-                if (canPlace) {
-                  for (let i = startDay; i <= endDay; i++) rows[targetRow][i] = task;
-                  taskLayoutRows.push({ task, row: targetRow, startDay, span: endDay - startDay + 1 });
-                  break;
-                } else {
-                  targetRow++;
-                }
-              }
-            });
+                    if (canPlace) {
+                      for (let i = startDay; i <= endDay; i++) rows[targetRow][i] = task;
+                      taskLayoutRows.push({ task, row: targetRow, startDay, span: endDay - startDay + 1 });
+                      break;
+                    } else {
+                      targetRow++;
+                    }
+                  }
+                });
 
-            const weekHeight = `calc(1.75rem + ${rows.length * 2.25}rem)`;
-            const monthOfFirstDay = startOfMonth(week[0]);
+                const weekHeight = `calc(1.75rem + ${rows.length * 2.25}rem)`;
+                const monthOfFirstDay = startOfMonth(week[0]);
 
-            return (
-              <div key={weekIndex} className="flex border-t border-slate-200">
-                 <div className="w-4 flex-shrink-0" style={{ backgroundColor: monthColorMap.get(format(monthOfFirstDay, 'yyyy-MM')) || '#64748b' }}></div>
-                 <div className="grid grid-cols-7 flex-grow relative" style={{ minHeight: weekHeight }}>
-                  {week.map((day, dayIndex) => (
-                    <div
-                      key={day.toString()}
-                      data-date={day.toISOString()}
-                      className={`border-l border-slate-200 p-1.5 transition-colors duration-200 ${!isSameMonth(day, monthOfFirstDay) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, today) ? 'bg-blue-100' : ''}`}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, day)}
-                      onClick={(e) => handleDayClick(e, day)}
-                      onTouchStart={() => handleDayTouchStart(day)} onTouchMove={handleDayTouchMove} onTouchEnd={handleDayTouchEnd}
-                    >
-                      <div className={`text-sm text-right ${!isSameMonth(day, monthOfFirstDay) ? 'text-slate-400' : 'text-slate-700'}`}>{format(day, 'd')}</div>
-                    </div>
-                  ))}
-                  <div className="absolute top-0 left-0 right-0 bottom-0 mt-[1.75rem] px-1 space-y-1">
-                    {taskLayoutRows.map(({ task, row, startDay, span }) => {
-                       const [showTooltip, setShowTooltip] = useState(false);
-                       const tooltipTimer = useRef<number | null>(null);
-                       const handleMouseEnter = () => { if (task.notes) { tooltipTimer.current = window.setTimeout(() => setShowTooltip(true), 1500); } };
-                       const handleMouseLeave = () => { if (tooltipTimer.current) clearTimeout(tooltipTimer.current); setShowTooltip(false); };
-                       
-                       const isActualStart = isSameDay(task.start, addDays(weekStart, startDay));
-                       const isActualEnd = isSameDay(task.end, addDays(weekStart, startDay + span - 1));
-                       
-                       let borderRadiusClasses = '';
-                       if (isActualStart) borderRadiusClasses += ' rounded-l-lg';
-                       if (isActualEnd) borderRadiusClasses += ' rounded-r-lg';
-                       if (isActualStart && isActualEnd) borderRadiusClasses = 'rounded-lg';
-
-                       const showText = isActualStart || startDay === 0;
-                       const group = task.groupId ? taskGroupMap.get(task.groupId) : undefined;
-                       const taskColor = task.executingUnit ? unitColorMap.get(task.executingUnit) : undefined;
-                       
-                       const isResizingThisTask = resizingInfo?.taskId === task.id;
-                       
-                       const dynamicClasses = touchedTaskIds.has(task.id)
-                         ? 'transform scale-105 ring-2 ring-yellow-400 ring-offset-2 z-10 shadow-lg'
-                         : selectedTaskIds.includes(task.id)
-                         ? 'ring-2 ring-offset-1 ring-blue-500 z-10'
-                         : 'shadow-sm hover:shadow-md';
-
-                      const style: React.CSSProperties = {
-                        top: `calc(${row * 2.25}rem)`,
-                        left: `calc(${(startDay / 7) * 100}% + 1px)`,
-                        width: `calc(${(span / 7) * 100}% - 2px)`,
-                      };
-
-                      return (
-                         <div
-                            key={task.id}
-                            draggable={!isResizingThisTask}
-                            data-task-id={task.id}
-                            onDragStart={(e) => {
-                                if (isResizingThisTask) {
-                                    e.preventDefault();
-                                    return;
-                                }
-                                handleDragStart(e, task.id);
-                            }}
-                            onClick={(e) => onSelectTask(task.id, e.ctrlKey || e.metaKey)}
-                            onDoubleClick={() => onEditTask(task)}
-                            onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}
-                            className={`group absolute h-8 flex items-center text-xs text-white transition-all duration-200 ${borderRadiusClasses} ${dynamicClasses} overflow-hidden`}
-                            style={style}
-                            title={task.name}
+                return (
+                  <div key={weekStart.toISOString()} className="flex border-t border-slate-200">
+                     <div className="w-4 flex-shrink-0" style={{ backgroundColor: monthColorMap.get(format(monthOfFirstDay, 'yyyy-MM')) || '#64748b' }}></div>
+                     <div className="grid grid-cols-7 flex-grow relative" style={{ minHeight: weekHeight }}>
+                      {week.map((day) => (
+                        <div
+                          key={day.toISOString()}
+                          data-date={day.toISOString()}
+                          className={`border-l border-slate-200 p-1.5 transition-colors duration-200 ${!isSameMonth(day, monthOfFirstDay) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, today) ? 'bg-blue-100' : ''}`}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, day)}
+                          onClick={(e) => handleDayClick(e, day)}
+                          onTouchStart={() => handleDayTouchStart(day)} onTouchMove={handleDayTouchMove} onTouchEnd={handleDayTouchEnd}
                         >
-                            <div className="absolute inset-0 w-full h-full" style={{backgroundColor: taskColor || '#3b82f6', borderLeft: group && isActualStart ? `4px solid ${group.color}` : 'none' }}></div>
-                            {isActualStart && (
-                                <div 
-                                    onMouseDown={(e) => handleResizeMouseDown(e, task, 'start')}
-                                    className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 opacity-50 hover:opacity-100 bg-black/20"
-                                />
-                            )}
-                            <div className="relative px-2 font-semibold truncate w-full h-full flex items-center" style={{ paddingLeft: group && isActualStart ? '0.25rem' : '0.5rem' }}>
-                              {showText ? task.name : ''}
-                            </div>
-                            {isActualEnd && (
-                                <div 
-                                    onMouseDown={(e) => handleResizeMouseDown(e, task, 'end')}
-                                    className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-10 opacity-50 hover:opacity-100 bg-black/20"
-                                />
-                            )}
-                            
-                            {task.groupId && showText && (
-                              <button onClick={(e) => { e.stopPropagation(); onUngroupTask(task.id); }} className="absolute -top-1 -right-1 bg-white p-0.5 rounded-full text-slate-500 hover:text-red-500 transition-colors shadow z-20" title="從群組中移除">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                              </button>
-                            )}
-                            {showTooltip && task.notes && (
-                              <div className="absolute bottom-full mb-2 w-max max-w-xs bg-slate-800 text-white text-xs rounded py-1 px-2 z-50 shadow-lg whitespace-pre-wrap" style={{ left: 0 }}>
-                                {task.notes}
-                              </div>
-                            )}
+                          <div className={`text-sm text-right ${!isSameMonth(day, monthOfFirstDay) ? 'text-slate-400' : 'text-slate-700'}`}>{format(day, 'd')}</div>
                         </div>
-                      );
-                    })}
+                      ))}
+                      <div className={`absolute top-0 left-0 right-0 bottom-0 mt-[1.75rem] px-1 space-y-1 ${draggingTaskId !== null ? 'pointer-events-none' : ''}`}>
+                        {taskLayoutRows.map(({ task, row, startDay, span }) => {
+                           const isResizingThisTask = resizingInfo?.taskId === task.id;
+                           return (
+                              <CalendarTask
+                                  key={task.id}
+                                  task={task}
+                                  weekStart={weekStart}
+                                  startDay={startDay}
+                                  span={span}
+                                  row={row}
+                                  draggingTaskId={draggingTaskId}
+                                  isResizingThisTask={isResizingThisTask}
+                                  touchedTaskIds={touchedTaskIds}
+                                  selectedTaskIds={selectedTaskIds}
+                                  taskGroupMap={taskGroupMap}
+                                  unitColorMap={unitColorMap}
+                                  onDragStart={handleDragStart}
+                                  setDraggingTaskId={setDraggingTaskId}
+                                  onSelectTask={onSelectTask}
+                                  onEditTask={onEditTask}
+                                  onUngroupTask={onUngroupTask}
+                                  handleResizeMouseDown={handleResizeMouseDown}
+                              />
+                           );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </React.Fragment>
+          ))}
         </div>
       </div>
       <DayViewModal date={dayViewDate} onClose={() => setDayViewDate(null)} tasks={filteredTasks} taskGroups={taskGroups} executingUnits={executingUnits} onEditTask={(task) => { setDayViewDate(null); onEditTask(task); }} onAddTaskForDate={(date) => { setDayViewDate(null); onOpenAddTaskModal(date); }} />
