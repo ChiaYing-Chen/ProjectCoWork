@@ -15,7 +15,6 @@ export interface Task {
   name: string;
   start: Date;
   end: Date;
-  progress: number;
   predecessorId?: number;
   groupId?: string;
   executingUnit?: string;

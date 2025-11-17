@@ -16,7 +16,6 @@ export const parseIcsFile = async (file: File): Promise<Task[]> => {
     } else if (line.startsWith('END:VEVENT')) {
       if (currentTask && currentTask.name && currentTask.start && currentTask.end) {
         tasks.push({
-            progress: 0, // 為匯入的任務設定預設進度
             ...currentTask
         } as Task);
       }
