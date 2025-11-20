@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Task, Warning, TaskGroup, ExecutingUnit } from '../types';
 import DayViewModal from './DayViewModal';
@@ -172,7 +173,7 @@ const CalendarTask: React.FC<{
                    className={`absolute left-0 top-0 bottom-0 w-2 z-10 opacity-50 hover:opacity-100 bg-black/20 ${isEditMode ? 'cursor-col-resize' : 'cursor-default'}`}
                />
            )}
-           <div className="relative px-2 font-semibold truncate w-full h-full flex items-center" style={{ paddingLeft: group && isActualStart ? '0.25rem' : '0.5rem' }}>
+           <div className="relative px-2 font-semibold truncate w-full h-full flex items-center text-white" style={{ paddingLeft: group && isActualStart ? '0.25rem' : '0.5rem' }}>
              {showText ? task.name : ''}
            </div>
            {isActualEnd && (
@@ -306,6 +307,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
     };
   }, [resizingInfo, onResizeTask]);
 
+
+  const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u.name)), [executingUnits, tasks]);
 
   const handleToggleUnit = (unitName: string) => {
     setDeselectedUnits(prev => {
@@ -461,8 +464,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
     return new Map(executingUnits.map(u => [u.name, u.color]));
   }, [executingUnits]);
 
-  const unitsInUse = useMemo(() => executingUnits.filter(u => tasks.some(t => t.executingUnit === u.name)), [executingUnits, tasks]);
-
   const handleDeleteClick = () => {
       if (selectedTaskIds.length > 0) {
           onDeleteSelectedTasks(selectedTaskIds);
@@ -495,6 +496,59 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         return { month: monthDate, weeks: monthWeeks };
     });
   }, [projectStartDate, projectEndDate, allMonths]);
+
+
+  // Pre-calculate layout for all weeks to determine the maximum row count (uniform height)
+  const { processedMonths, maxRowDepth } = useMemo(() => {
+    let maxDepth = 0;
+    
+    const processed = monthlyData.map(({ month, weeks }) => {
+        const processedWeeks = weeks.map(week => {
+            const weekStart = week[0];
+            const weekEnd = week[6];
+
+            const tasksInWeek = tasksToRender
+              .filter(task => task.start <= weekEnd && task.end >= weekStart)
+              .sort((a, b) => a.start.getTime() - b.start.getTime() || (b.end.getTime() - a.start.getTime()) - (a.end.getTime() - a.start.getTime()));
+
+            const taskLayoutRows: { task: Task, row: number, startDay: number, span: number }[] = [];
+            const rows: (Task | null)[][] = [];
+
+            tasksInWeek.forEach(task => {
+              const startDay = isBefore(task.start, weekStart) ? 0 : differenceInDays(task.start, weekStart);
+              const endDay = isAfter(task.end, weekEnd) ? 6 : differenceInDays(task.end, weekStart);
+
+              let targetRow = 0;
+              while (true) {
+                if (rows.length <= targetRow) rows.push(Array(7).fill(null));
+
+                const canPlace = !rows[targetRow].slice(startDay, endDay + 1).some(Boolean);
+
+                if (canPlace) {
+                  for (let i = startDay; i <= endDay; i++) rows[targetRow][i] = task;
+                  taskLayoutRows.push({ task, row: targetRow, startDay, span: endDay - startDay + 1 });
+                  break;
+                } else {
+                  targetRow++;
+                }
+              }
+            });
+            
+            // Update global max depth
+            if (rows.length > maxDepth) {
+                maxDepth = rows.length;
+            }
+
+            return { week, taskLayoutRows, rowCount: rows.length };
+        });
+        return { month, processedWeeks };
+    });
+
+    // Ensure at least 3 rows for visual comfort even if empty
+    return { processedMonths: processed, maxRowDepth: Math.max(maxDepth, 3) };
+  }, [monthlyData, tasksToRender]);
+
+  const uniformWeekHeight = `calc(1.75rem + ${maxRowDepth * 2.25}rem)`;
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-2 sm:p-4 flex flex-col view-container" style={{ height: 'calc(100vh - 120px)' }}>
@@ -558,7 +612,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="sticky top-0 bg-white z-20 border-b-2 border-slate-200">
+        <div className="sticky top-0 bg-white z-20 border-b-2 border-slate-200 print:hidden">
           <div className="relative">
             {selectedTaskIds.length > 0 && (
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 z-10">
@@ -580,46 +634,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         </div>
 
         <div>
-          {monthlyData.map(({ month, weeks }) => (
+          {processedMonths.map(({ month, processedWeeks }, index) => (
             <React.Fragment key={month.toISOString()}>
-              {weeks.map((week) => {
+              {/* Print-only header that appears before every month block to assist with page breaks */}
+              <div className="hidden print:grid grid-cols-7 text-center font-bold text-slate-800 border-b border-slate-800 mb-1 mt-4 break-after-avoid">
+                 {['日', '一', '二', '三', '四', '五', '六'].map(day => (<div key={day} className="py-1">{day}</div>))}
+              </div>
+
+              {processedWeeks.map(({ week, taskLayoutRows }) => {
                 const weekStart = week[0];
-                const weekEnd = week[6];
-
-                const tasksInWeek = tasksToRender
-                  .filter(task => task.start <= weekEnd && task.end >= weekStart)
-                  .sort((a, b) => a.start.getTime() - b.start.getTime() || (b.end.getTime() - a.start.getTime()) - (a.end.getTime() - a.start.getTime()));
-
-                const taskLayoutRows: { task: Task, row: number, startDay: number, span: number }[] = [];
-                const rows: (Task | null)[][] = [];
-
-                tasksInWeek.forEach(task => {
-                  const startDay = isBefore(task.start, weekStart) ? 0 : differenceInDays(task.start, weekStart);
-                  const endDay = isAfter(task.end, weekEnd) ? 6 : differenceInDays(task.end, weekStart);
-
-                  let targetRow = 0;
-                  while (true) {
-                    if (rows.length <= targetRow) rows.push(Array(7).fill(null));
-
-                    const canPlace = !rows[targetRow].slice(startDay, endDay + 1).some(Boolean);
-
-                    if (canPlace) {
-                      for (let i = startDay; i <= endDay; i++) rows[targetRow][i] = task;
-                      taskLayoutRows.push({ task, row: targetRow, startDay, span: endDay - startDay + 1 });
-                      break;
-                    } else {
-                      targetRow++;
-                    }
-                  }
-                });
-
-                const weekHeight = `calc(1.75rem + ${rows.length * 2.25}rem)`;
                 const monthOfFirstDay = startOfMonth(week[0]);
 
                 return (
-                  <div key={weekStart.toISOString()} className="flex border-t border-slate-200">
+                  <div key={weekStart.toISOString()} className="flex border-t border-slate-200 break-inside-avoid">
                      <div className="w-2.5 flex-shrink-0" style={{ backgroundColor: monthColorMap.get(format(monthOfFirstDay, 'yyyy-MM')) || '#64748b' }}></div>
-                     <div className="grid grid-cols-7 flex-grow relative" style={{ minHeight: weekHeight }}>
+                     <div className="grid grid-cols-7 flex-grow relative" style={{ minHeight: uniformWeekHeight }}>
                       {week.map((day) => (
                         <div
                           key={day.toISOString()}
