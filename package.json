@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node -e \"require('fs').writeFileSync('docs/.nojekyll', '')\"",
+    "build": "node build-docs.js",
     "preview": "vite preview"
   },
   "dependencies": {
