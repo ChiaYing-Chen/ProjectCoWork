@@ -687,9 +687,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                     Header Logic:
                     - Screen Mode: Hidden (using sticky header instead).
                     - Print Mode: Visible for EVERY page block.
+                    - FIX: Added w-2.5 spacer to align with week rows.
                 */}
-                <div className={`hidden print:grid grid-cols-7 text-center font-bold text-slate-800 border-b-2 border-slate-800 mb-1 ${pageIndex === 0 ? 'mt-0' : 'mt-4'}`}>
-                     {['日', '一', '二', '三', '四', '五', '六'].map(day => (<div key={day} className="py-1">{day}</div>))}
+                <div className={`hidden print:flex text-center font-bold text-slate-800 border-b-2 border-slate-800 mb-1 ${pageIndex === 0 ? 'mt-0' : 'mt-4'}`}>
+                     <div className="w-2.5 flex-shrink-0"></div>
+                     <div className="grid grid-cols-7 flex-grow">
+                        {['日', '一', '二', '三', '四', '五', '六'].map(day => (<div key={day} className="py-1">{day}</div>))}
+                     </div>
                 </div>
 
                 {pageWeeks.map(({ week, taskLayoutRows, monthColor }) => {

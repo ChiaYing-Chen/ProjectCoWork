@@ -30,7 +30,7 @@
   @media print {
     @page {
       size: landscape;
-      margin: 10mm auto; /* Top/Bottom margin 10mm, Auto left/right for centering */
+      margin: 5mm; /* Fixed margin to maximize printable area */
     }
 
     /* Force background colors and graphics */
@@ -46,12 +46,21 @@
     .view-container > div:first-child, /* Hides filter bars in both views */
     .calendar-print-container .sticky .absolute, /* Calendar action menu */
     [data-task-id] button, /* Calendar ungroup button */
-    .calendar-print-container .w-2\.5.flex-shrink-0 /* Calendar month color bar */
+    .calendar-print-container .w-2\.5.flex-shrink-0 /* Calendar month color bar - Keep it visible now for layout, handled in component */
     {
-      display: none !important;
+      /* display: none !important; - Removed to allow specific handling */
     }
     
-    /* Reset body and main container for printing - Top Align & Center */
+    /* Explicitly hide specific interactive elements */
+    header,
+    .fixed, 
+    .view-container > div:first-child,
+    .calendar-print-container .sticky .absolute,
+    [data-task-id] button {
+        display: none !important;
+    }
+    
+    /* Reset body and main container for printing - Block Layout to prevent squeezing */
     body {
       margin: 0;
       padding: 0;
@@ -62,16 +71,15 @@
     
     #root {
       width: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start; /* Top align */
+      display: block; /* Changed from flex to block */
     }
     
     main.container {
       padding: 0 !important;
-      margin: 0 auto !important; /* Center horizontally */
+      margin: 0 !important;
       max-width: 100% !important;
       width: 100% !important;
+      display: block;
     }
 
     /* Ensure the view container takes up the whole space */
@@ -79,11 +87,11 @@
       box-shadow: none !important;
       border: none !important;
       padding: 0 !important;
-      margin: 0 auto !important;
+      margin: 0 !important;
       border-radius: 0 !important;
       height: auto !important;
       width: 100% !important;
-      align-items: center; /* Center content inside */
+      display: block !important; /* Changed from flex to block */
     }
 
     /* Gantt Chart specific adjustments */
@@ -151,7 +159,8 @@
     /* Page block handling */
     .print-page-block {
         width: 100%;
-        margin: 0 auto;
+        margin: 0;
+        display: block;
     }
   }
 </style>
