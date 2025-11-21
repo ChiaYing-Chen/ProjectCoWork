@@ -30,7 +30,7 @@
   @media print {
     @page {
       size: landscape;
-      margin: 10mm;
+      margin: 10mm auto; /* Top/Bottom margin 10mm, Auto left/right for centering */
     }
 
     /* Force background colors and graphics */
@@ -51,17 +51,27 @@
       display: none !important;
     }
     
-    /* Reset body and main container for printing */
+    /* Reset body and main container for printing - Top Align & Center */
     body {
       margin: 0;
       padding: 0;
       font-size: 9pt;
+      width: 100%;
+      display: block;
+    }
+    
+    #root {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start; /* Top align */
     }
     
     main.container {
       padding: 0 !important;
-      margin: 0 !important;
-      max-width: none !important;
+      margin: 0 auto !important; /* Center horizontally */
+      max-width: 100% !important;
+      width: 100% !important;
     }
 
     /* Ensure the view container takes up the whole space */
@@ -69,9 +79,11 @@
       box-shadow: none !important;
       border: none !important;
       padding: 0 !important;
-      margin: 0 !important;
+      margin: 0 auto !important;
       border-radius: 0 !important;
       height: auto !important;
+      width: 100% !important;
+      align-items: center; /* Center content inside */
     }
 
     /* Gantt Chart specific adjustments */
@@ -87,11 +99,12 @@
        max-height: none !important; /* Remove the scroll constraint */
        overflow-y: visible !important;
        display: block !important;
+       width: 100% !important;
     }
     
     /* Darken grid lines for print visibility */
     .calendar-print-container .border-slate-200 {
-        border-color: #94a3b8 !important; /* slate-400 */
+        border-color: #64748b !important; /* slate-500 - general borders */
     }
     
     /* Ensure text is dark enough */
@@ -101,7 +114,7 @@
 
     .calendar-print-container .sticky {
         position: static !important;
-        border-bottom: 1px solid #64748b !important;
+        border-bottom: 2px solid #0f172a !important; /* Header border darker */
     }
 
     /* Make day cells flexible height */
@@ -133,6 +146,12 @@
     .calendar-print-container [data-task-id] .text-white {
         color: white !important;
         text-shadow: 0 0 2px rgba(0,0,0,0.5); /* Text shadow for contrast */
+    }
+    
+    /* Page block handling */
+    .print-page-block {
+        width: 100%;
+        margin: 0 auto;
     }
   }
 </style>

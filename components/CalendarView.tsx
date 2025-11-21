@@ -559,7 +559,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
 
     // 2. Pagination Logic based on Height
     // A4 Landscape Height: ~210mm. 
-    // Safe printable height target: ~150mm (leaving 60mm for margins/headers/footers)
+    // Safe printable height target: ~170mm (increased from 150mm)
     
     const REM_TO_MM = 4.23; // 1rem ~= 4.23mm
     const HEADER_HEIGHT_MM = 12; // "Sun Mon Tue..." header row height estimate
@@ -568,7 +568,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
     const weekHeightRem = 1.75 + (finalMaxDepth * 2.25); 
     const weekHeightMm = weekHeightRem * REM_TO_MM;
 
-    const MAX_PAGE_CONTENT_HEIGHT_MM = 150;
+    const MAX_PAGE_CONTENT_HEIGHT_MM = 170;
 
     const pages: typeof flatWeeks[] = [];
     let currentPage: typeof flatWeeks = [];
@@ -688,7 +688,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                     - Screen Mode: Hidden (using sticky header instead).
                     - Print Mode: Visible for EVERY page block.
                 */}
-                <div className={`hidden print:grid grid-cols-7 text-center font-bold text-slate-800 border-b border-slate-800 mb-1 ${pageIndex === 0 ? 'mt-0' : 'mt-4'}`}>
+                <div className={`hidden print:grid grid-cols-7 text-center font-bold text-slate-800 border-b-2 border-slate-800 mb-1 ${pageIndex === 0 ? 'mt-0' : 'mt-4'}`}>
                      {['日', '一', '二', '三', '四', '五', '六'].map(day => (<div key={day} className="py-1">{day}</div>))}
                 </div>
 
@@ -697,7 +697,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                     const monthOfFirstDay = startOfMonth(week[0]);
 
                     return (
-                    <div key={weekStart.toISOString()} className="flex border-t border-slate-200 break-inside-avoid">
+                    <div key={weekStart.toISOString()} className="flex border-t border-slate-200 print:border-t-2 print:border-slate-800 break-inside-avoid">
                         <div className="w-2.5 flex-shrink-0" style={{ backgroundColor: monthColor }}></div>
                         <div className="grid grid-cols-7 flex-grow relative" style={{ minHeight: uniformWeekHeight }}>
                         {week.map((day) => (
