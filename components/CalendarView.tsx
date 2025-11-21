@@ -749,6 +749,45 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
                     </div>
                     );
                 })}
+
+                {/* Print Legend - Only visible on the LAST page */}
+                {pageIndex === printPages.length - 1 && (
+                    <div className="hidden print:block mt-6 p-4 border-2 border-slate-300 rounded-lg break-inside-avoid">
+                        <h4 className="font-bold text-slate-800 mb-3 text-sm">圖例說明</h4>
+                        <div className="flex flex-wrap gap-8">
+                            {allMonths.length > 0 && (
+                                <div className="flex flex-col gap-2">
+                                    <span className="text-xs font-semibold text-slate-500">月份</span>
+                                    <div className="flex flex-wrap gap-3">
+                                        {Array.from(monthColorMap.entries()).map(([monthKey, color]) => (
+                                            <div key={monthKey} className="flex items-center">
+                                                <div className="w-3 h-3 mr-1 shadow-sm border border-slate-200" style={{ backgroundColor: color }}></div>
+                                                <span className="text-xs text-slate-700">
+                                                    {format(new Date(monthKey + '-01T00:00:00'), 'yyyy/M', { locale: zhTW })}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {unitsInUse.length > 0 && (
+                                <div className="flex flex-col gap-2">
+                                    <span className="text-xs font-semibold text-slate-500">執行單位</span>
+                                    <div className="flex flex-wrap gap-3">
+                                        {unitsInUse.map(unit => (
+                                            <div key={unit.name} className="flex items-center">
+                                                <div className="w-3 h-3 rounded-sm mr-1 shadow-sm" style={{ backgroundColor: unit.color }}></div>
+                                                <span className={`text-xs text-slate-700 ${deselectedUnits.has(unit.name) ? 'line-through text-slate-400' : ''}`}>
+                                                    {unit.name}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
           ))}
         </div>

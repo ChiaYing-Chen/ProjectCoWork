@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { ViewMode, Project } from '../types';
 import { format } from 'date-fns';
@@ -91,9 +92,6 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center space-x-4 min-w-0">
             {project ? (
                <>
-                <button onClick={onBackToProjects} className="flex items-center justify-center text-slate-500 hover:text-blue-600 transition duration-300 p-1.5 -ml-1.5 rounded-full flex-shrink-0 w-7 h-7" title="返回專案列表">
-                    <span className="text-sm">🗂️</span>
-                </button>
                 <div className="flex items-baseline space-x-4 min-w-0">
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-800 truncate">{project.name}</h1>
                     <div className="hidden md:flex items-center space-x-2 bg-slate-100 px-3 py-1 rounded-full">
@@ -145,6 +143,8 @@ const Header: React.FC<HeaderProps> = ({
                                 <li><button onClick={() => { onSaveProject(); setIsFileMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><span className="w-5 text-center mr-3">💾</span>儲存 (Ctrl+S)</button></li>
                               }
                               <li><button onClick={() => { onPrint(); setIsFileMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><span className="w-5 text-center mr-3">🖨️</span>列印</button></li>
+                              <div className="my-1 border-t border-slate-100"></div>
+                              <li><button onClick={() => { onBackToProjects(); setIsFileMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"><span className="w-5 text-center mr-3">🗂️</span>返回專案列表</button></li>
                             </>
                           ) : (
                             <>
