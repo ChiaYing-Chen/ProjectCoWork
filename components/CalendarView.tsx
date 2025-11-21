@@ -498,14 +498,26 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
   }, [projectStartDate, projectEndDate, allMonths]);
 
 
-  // Pre-calculate layout for all weeks to determine the maximum row count (uniform height)
-  const { processedMonths, maxRowDepth } = useMemo(() => {
+  // Pre-calculate layout and PAGINATION logic for Print
+  const { printPages, maxRowDepth } = useMemo(() => {
     let maxDepth = 0;
     
-    const processed = monthlyData.map(({ month, weeks }) => {
-        const processedWeeks = weeks.map(week => {
+    // 1. Flatten Weeks and Calculate Max Depth
+    const flatWeeks: { 
+        week: Date[], 
+        taskLayoutRows: { task: Task, row: number, startDay: number, span: number }[],
+        monthColor: string
+    }[] = [];
+
+    // First pass: Layout calculation and finding maxDepth
+    monthlyData.forEach(({ month, weeks }) => {
+        weeks.forEach(week => {
             const weekStart = week[0];
             const weekEnd = week[6];
+            
+            // Use the month of the first day of the week to determine color bar
+            const weekMonthKey = format(startOfMonth(weekStart), 'yyyy-MM');
+            const monthColor = monthColorMap.get(weekMonthKey) || '#64748b';
 
             const tasksInWeek = tasksToRender
               .filter(task => task.start <= weekEnd && task.end >= weekStart)
@@ -534,19 +546,54 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
               }
             });
             
-            // Update global max depth
             if (rows.length > maxDepth) {
                 maxDepth = rows.length;
             }
 
-            return { week, taskLayoutRows, rowCount: rows.length };
+            flatWeeks.push({ week, taskLayoutRows, monthColor });
         });
-        return { month, processedWeeks };
     });
 
-    // Ensure at least 3 rows for visual comfort even if empty
-    return { processedMonths: processed, maxRowDepth: Math.max(maxDepth, 3) };
-  }, [monthlyData, tasksToRender]);
+    // Ensure at least 3 rows for visual comfort
+    const finalMaxDepth = Math.max(maxDepth, 3);
+
+    // 2. Pagination Logic based on Height
+    // A4 Landscape Height: ~210mm. 
+    // Safe printable height target: ~150mm (leaving 60mm for margins/headers/footers)
+    
+    const REM_TO_MM = 4.23; // 1rem ~= 4.23mm
+    const HEADER_HEIGHT_MM = 12; // "Sun Mon Tue..." header row height estimate
+    
+    // Week Row Height = Date Header (1.75rem) + Task Rows (maxDepth * 2.25rem)
+    const weekHeightRem = 1.75 + (finalMaxDepth * 2.25); 
+    const weekHeightMm = weekHeightRem * REM_TO_MM;
+
+    const MAX_PAGE_CONTENT_HEIGHT_MM = 150;
+
+    const pages: typeof flatWeeks[] = [];
+    let currentPage: typeof flatWeeks = [];
+    let currentHeightMm = HEADER_HEIGHT_MM; // Initial height includes the header
+
+    flatWeeks.forEach(week => {
+        if (currentHeightMm + weekHeightMm > MAX_PAGE_CONTENT_HEIGHT_MM) {
+            // Push current page and start new one
+            if (currentPage.length > 0) {
+                pages.push(currentPage);
+            }
+            currentPage = [];
+            currentHeightMm = HEADER_HEIGHT_MM;
+        }
+        
+        currentPage.push(week);
+        currentHeightMm += weekHeightMm;
+    });
+
+    if (currentPage.length > 0) {
+        pages.push(currentPage);
+    }
+
+    return { printPages: pages, maxRowDepth: finalMaxDepth };
+  }, [monthlyData, tasksToRender, monthColorMap]);
 
   const uniformWeekHeight = `calc(1.75rem + ${maxRowDepth * 2.25}rem)`;
 
@@ -634,67 +681,71 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, projectStartDate, pr
         </div>
 
         <div>
-          {processedMonths.map(({ month, processedWeeks }, index) => (
-            <React.Fragment key={month.toISOString()}>
-              {/* Print-only header that appears before every month block to assist with page breaks */}
-              <div className="hidden print:grid grid-cols-7 text-center font-bold text-slate-800 border-b border-slate-800 mb-1 mt-4 break-after-avoid">
-                 {['日', '一', '二', '三', '四', '五', '六'].map(day => (<div key={day} className="py-1">{day}</div>))}
-              </div>
+          {printPages.map((pageWeeks, pageIndex) => (
+            <div key={pageIndex} className="print-page-block break-after-page">
+                {/* 
+                    Header Logic:
+                    - Screen Mode: Hidden (using sticky header instead).
+                    - Print Mode: Visible for EVERY page block.
+                */}
+                <div className={`hidden print:grid grid-cols-7 text-center font-bold text-slate-800 border-b border-slate-800 mb-1 ${pageIndex === 0 ? 'mt-0' : 'mt-4'}`}>
+                     {['日', '一', '二', '三', '四', '五', '六'].map(day => (<div key={day} className="py-1">{day}</div>))}
+                </div>
 
-              {processedWeeks.map(({ week, taskLayoutRows }) => {
-                const weekStart = week[0];
-                const monthOfFirstDay = startOfMonth(week[0]);
+                {pageWeeks.map(({ week, taskLayoutRows, monthColor }) => {
+                    const weekStart = week[0];
+                    const monthOfFirstDay = startOfMonth(week[0]);
 
-                return (
-                  <div key={weekStart.toISOString()} className="flex border-t border-slate-200 break-inside-avoid">
-                     <div className="w-2.5 flex-shrink-0" style={{ backgroundColor: monthColorMap.get(format(monthOfFirstDay, 'yyyy-MM')) || '#64748b' }}></div>
-                     <div className="grid grid-cols-7 flex-grow relative" style={{ minHeight: uniformWeekHeight }}>
-                      {week.map((day) => (
-                        <div
-                          key={day.toISOString()}
-                          data-date={day.toISOString()}
-                          className={`border-l border-slate-200 p-1.5 transition-colors duration-200 ${!isSameMonth(day, monthOfFirstDay) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, today) ? 'bg-blue-100' : ''}`}
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, day)}
-                          onClick={(e) => handleDayClick(e, day)}
-                          onTouchStart={() => handleDayTouchStart(day)} onTouchMove={handleDayTouchMove} onTouchEnd={handleDayTouchEnd}
-                        >
-                          <div className={`text-sm text-right ${!isSameMonth(day, monthOfFirstDay) ? 'text-slate-400' : 'text-slate-700'}`}>{format(day, 'd')}</div>
+                    return (
+                    <div key={weekStart.toISOString()} className="flex border-t border-slate-200 break-inside-avoid">
+                        <div className="w-2.5 flex-shrink-0" style={{ backgroundColor: monthColor }}></div>
+                        <div className="grid grid-cols-7 flex-grow relative" style={{ minHeight: uniformWeekHeight }}>
+                        {week.map((day) => (
+                            <div
+                            key={day.toISOString()}
+                            data-date={day.toISOString()}
+                            className={`border-l border-slate-200 p-1.5 transition-colors duration-200 ${!isSameMonth(day, monthOfFirstDay) ? 'bg-slate-50' : 'bg-white'} ${isSameDay(day, today) ? 'bg-blue-100' : ''}`}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, day)}
+                            onClick={(e) => handleDayClick(e, day)}
+                            onTouchStart={() => handleDayTouchStart(day)} onTouchMove={handleDayTouchMove} onTouchEnd={handleDayTouchEnd}
+                            >
+                            <div className={`text-sm text-right ${!isSameMonth(day, monthOfFirstDay) ? 'text-slate-400' : 'text-slate-700'}`}>{format(day, 'd')}</div>
+                            </div>
+                        ))}
+                        <div className={`absolute top-0 left-0 right-0 bottom-0 mt-[1.75rem] px-1 ${draggingTaskId !== null ? 'pointer-events-none' : ''}`}>
+                            {taskLayoutRows.map(({ task, row, startDay, span }) => {
+                            const isResizingThisTask = resizingInfo?.taskId === task.id;
+                            return (
+                                <CalendarTask
+                                    key={task.id}
+                                    task={task}
+                                    weekStart={weekStart}
+                                    startDay={startDay}
+                                    span={span}
+                                    row={row}
+                                    draggingTaskId={draggingTaskId}
+                                    isResizingThisTask={isResizingThisTask}
+                                    touchedTaskIds={touchedTaskIds}
+                                    selectedTaskIds={selectedTaskIds}
+                                    taskGroupMap={taskGroupMap}
+                                    unitColorMap={unitColorMap}
+                                    onDragStart={handleDragStart}
+                                    setDraggingTaskId={setDraggingTaskId}
+                                    onSelectTask={onSelectTask}
+                                    onEditTask={onEditTask}
+                                    onUngroupTask={onUngroupTask}
+                                    handleResizeMouseDown={handleResizeMouseDown}
+                                    isEditMode={isEditMode}
+                                />
+                            );
+                            })}
                         </div>
-                      ))}
-                      <div className={`absolute top-0 left-0 right-0 bottom-0 mt-[1.75rem] px-1 ${draggingTaskId !== null ? 'pointer-events-none' : ''}`}>
-                        {taskLayoutRows.map(({ task, row, startDay, span }) => {
-                           const isResizingThisTask = resizingInfo?.taskId === task.id;
-                           return (
-                              <CalendarTask
-                                  key={task.id}
-                                  task={task}
-                                  weekStart={weekStart}
-                                  startDay={startDay}
-                                  span={span}
-                                  row={row}
-                                  draggingTaskId={draggingTaskId}
-                                  isResizingThisTask={isResizingThisTask}
-                                  touchedTaskIds={touchedTaskIds}
-                                  selectedTaskIds={selectedTaskIds}
-                                  taskGroupMap={taskGroupMap}
-                                  unitColorMap={unitColorMap}
-                                  onDragStart={handleDragStart}
-                                  setDraggingTaskId={setDraggingTaskId}
-                                  onSelectTask={onSelectTask}
-                                  onEditTask={onEditTask}
-                                  onUngroupTask={onUngroupTask}
-                                  handleResizeMouseDown={handleResizeMouseDown}
-                                  isEditMode={isEditMode}
-                              />
-                           );
-                        })}
-                      </div>
+                        </div>
                     </div>
-                  </div>
-                );
-              })}
-            </React.Fragment>
+                    );
+                })}
+            </div>
           ))}
         </div>
       </div>
